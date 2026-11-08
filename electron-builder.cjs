@@ -1,0 +1,26 @@
+module.exports = {
+  appId: "ir.hamshift.desktop",
+  productName: "Hamshift",
+  executableName: "Hamshift",
+  electronVersion: "45.2.3",
+  asar: true,
+  npmRebuild: false,
+  directories: { output: "out", buildResources: "assets" },
+  files: [
+    "dist/index.html",
+    "electron/**",
+    "!electron/*.test.cjs",
+    "assets/hamshift.png",
+    "assets/hamshift.ico",
+    "assets/vazirmatn.woff2",
+    "assets/font-licenses/**",
+    "!node_modules/**",
+  ],
+  electronLanguages: ["en-US", "fa"],
+  win: {
+    icon: "assets/hamshift.ico",
+    signAndEditExecutable: false,
+    target: ["dir"],
+  },
+  afterPack: "./scripts/windows-resources.cjs",
+};

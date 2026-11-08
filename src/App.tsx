@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import {
   ArrowDownToLine,
   ArrowLeft,
@@ -81,6 +81,10 @@ import {
 } from "./lib/excel";
 import { loadData, saveData, validateBackup } from "./lib/storage";
 
+import logo from "../assets/hamshift.svg";
+import { AppearancePanel } from "./AppearancePanel";
+import { defaultAppearance } from "./lib/appearance";
+
 type Page =
   | "schedule"
   | "people"
@@ -117,6 +121,17 @@ const statusLabels = {
 export default function App() {
   const [loaded] = useState(loadData);
   const [data, setData] = useState<AppData>(loaded.data);
+  const appearance = data.appearance || defaultAppearance;
+  useLayoutEffect(() => {
+    document.documentElement.dataset.theme = appearance.theme;
+    document.documentElement.dataset.font = appearance.font;
+    document.documentElement.style.colorScheme =
+      appearance.theme === "midnight" ? "dark" : "light";
+  }, [appearance.theme, appearance.font]);
+  useEffect(() => {
+    document.fonts.ready.then(() => window.desktop?.ready());
+  }, []);
+
   const [storageError, setStorageError] = useState(loaded.error || "");
   const [page, setPage] = useState<Page>("schedule");
   const [dialog, setDialog] = useState<Dialog>(null);
@@ -246,7 +261,7 @@ export default function App() {
       return true;
     } catch {
       const msg =
-        "ذخیره‌سازی انجام نشد؛ فضای مرورگر یا دسترسی به حافظه را بررسی و نسخهٔ پشتیبان دریافت کنید.";
+        "ذخیره‌سازی انجام نشد؛ فضای دستگاه یا دسترسی به حافظه را بررسی و نسخهٔ پشتیبان دریافت کنید.";
       setError(msg);
       showToast(msg);
       return false;
@@ -258,7 +273,7 @@ export default function App() {
         saveData(loaded.data);
       } catch {
         setStorageError(
-          "مرورگر اجازهٔ ذخیرهٔ داده‌ها را نمی‌دهد. دسترسی به حافظهٔ محلی را فعال کنید.",
+          "ذخیرهٔ داده‌ها در دستگاه ممکن نیست. فضای آزاد و دسترسی نوشتن را بررسی کنید.",
         );
       }
     }
@@ -525,7 +540,7 @@ export default function App() {
           }}
         >
           <span className="brand-mark">
-            <Grid2X2 size={25} strokeWidth={2.3} />
+            <img src={logo} alt="لوگوی هم‌شیفت" />
           </span>
           <span>
             <b>
@@ -599,7 +614,7 @@ export default function App() {
               <b>مدیر سیستم</b>
               <small>فضای کاری شخصی</small>
             </div>
-            <span className="version">۱.۰</span>
+            <span className="version">۲.۰</span>
           </div>
         </div>
       </aside>
@@ -1622,6 +1637,16 @@ export default function App() {
 
           {page === "settings" && (
             <div className="settings-layout">
+              <AppearancePanel
+                value={appearance}
+                onChange={(value) =>
+                  commit(
+                    { ...data, appearance: value },
+                    "ظاهر برنامه ذخیره شد.",
+                  )
+                }
+                notify={showToast}
+              />
               <section className="panel settings-panel">
                 <div className="settings-title">
                   <Settings2 size={21} />
@@ -1731,14 +1756,13 @@ export default function App() {
                   <HardDriveDownload size={21} />
                   <div>
                     <h2>پشتیبان‌گیری و بازیابی</h2>
-                    <p>اطلاعات فقط در همین مرورگر و دستگاه ذخیره می‌شوند.</p>
+                    <p>اطلاعات فقط در همین دستگاه نگهداری می‌شوند.</p>
                   </div>
                 </div>
                 <p className="body-text">
-                  پاک کردن اطلاعات مرورگر یا تغییر دستگاه می‌تواند دسترسی به
-                  داده‌ها را از بین ببرد. به‌صورت منظم پشتیبان بگیرید و فایل را
-                  در محل امن نگه دارید. فایل پشتیبان شامل اطلاعات شخصی پرسنل
-                  است.
+                  حذف فایل‌های داده یا تغییر دستگاه می‌تواند دسترسی به داده‌ها
+                  را از بین ببرد. به‌صورت منظم پشتیبان بگیرید و فایل را در محل
+                  امن نگه دارید. فایل پشتیبان شامل اطلاعات شخصی پرسنل است.
                 </p>
                 <div className="backup-actions">
                   <button className="button button-primary" onClick={backup}>
@@ -2564,7 +2588,7 @@ export default function App() {
         >
           <div className="modal-body help-body">
             <div className="help-hero">
-              <Grid2X2 size={34} />
+              <img className="help-logo" src={logo} alt="هم‌شیفت" />
               <strong>برنامهٔ بهتر، برای همه</strong>
               <p>تمام قابلیت‌ها و فونت‌ها در نسخهٔ آفلاین همراه برنامه‌اند.</p>
             </div>
@@ -2587,7 +2611,7 @@ export default function App() {
               [
                 "۴",
                 "پشتیبان بگیرید",
-                "داده‌ها فقط در همین دستگاه و مرورگرند. با دریافت فایل پشتیبان می‌توانید آن‌ها را به دستگاه دیگری منتقل کنید.",
+                "داده‌ها فقط در همین دستگاه نگهداری می‌شوند. با دریافت فایل پشتیبان می‌توانید آن‌ها را به دستگاه دیگری منتقل کنید.",
               ],
             ].map(([n, title, text]) => (
               <div className="help-step" key={n}>
@@ -2599,9 +2623,9 @@ export default function App() {
               </div>
             ))}
             <Notice>
-              برای اجرای کاملاً آفلاین، فایل نسخهٔ آفلاین برنامه را در مرورگر
-              باز کنید. ورود و خروج اکسل، تقویم، برنامه‌ریزی و پشتیبان‌گیری به
-              اینترنت نیاز ندارند.
+              نسخهٔ نصب‌شدهٔ ویندوز با آیکون هم‌شیفت در دسکتاپ اجرا می‌شود و به
+              مرورگر یا اینترنت نیاز ندارد. ورود و خروج اکسل، تقویم، برنامه‌ریزی
+              و پشتیبان‌گیری به اینترنت نیاز ندارند.
             </Notice>
           </div>
           <div className="modal-footer">

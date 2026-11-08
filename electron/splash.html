@@ -1,0 +1,171 @@
+<!doctype html>
+<html lang="fa" dir="rtl">
+  <head>
+    <meta charset="utf-8" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'none'; script-src 'self'; style-src 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'none'"
+    />
+    <title>هم‌شیفت | در حال آماده‌سازی</title>
+    <style>
+      @font-face {
+        font-family: Vazirmatn;
+        src: url("../assets/vazirmatn.woff2") format("woff2");
+        font-weight: 100 900;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        font-family: Vazirmatn, Tahoma, sans-serif;
+        background: #101f2c;
+        color: #e9f5ef;
+        overflow: hidden;
+        user-select: none;
+      }
+      .splash {
+        height: 100vh;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        position: relative;
+        background: radial-gradient(ellipse at 50% 10%, #20564e, #101f2c 75%);
+        border: 1px solid #8acdaf23;
+      }
+      .orbit {
+        position: absolute;
+        width: 320px;
+        height: 320px;
+        border: 1px solid #70c8a919;
+        top: -75px;
+        border-radius: 50%;
+        box-shadow:
+          0 0 0 28px #70c8a907,
+          0 0 0 58px #70c8a905;
+        pointer-events: none;
+      }
+      .logo-shell {
+        width: 220px;
+        height: 125px;
+        display: grid;
+        place-items: center;
+        position: relative;
+        margin-top: 10px;
+      }
+      .logo-shell img {
+        max-width: 200px;
+        max-height: 120px;
+        object-fit: contain;
+        filter: drop-shadow(0 12px 22px #0003);
+      }
+      h1 {
+        font-size: 29px;
+        font-weight: 800;
+        letter-spacing: -1px;
+        margin: 16px 0 6px;
+        position: relative;
+      }
+      p {
+        font-size: 12px;
+        color: #96b7aa;
+        margin: 0 0 27px;
+        position: relative;
+      }
+      .loader {
+        height: 4px;
+        width: 132px;
+        background: #72d2ad18;
+        border-radius: 4px;
+        overflow: hidden;
+        position: relative;
+      }
+      .loader span {
+        display: block;
+        width: 40%;
+        height: 100%;
+        border-radius: 4px;
+        background: linear-gradient(90deg, #39ae8c, #a7e9ca);
+        animation: travel 1.4s ease-in-out infinite;
+      }
+      .state {
+        font-size: 10px;
+        color: #779e8c;
+        margin-top: 13px;
+        letter-spacing: 0.2px;
+      }
+      .footer {
+        position: absolute;
+        bottom: 16px;
+        left: 22px;
+        right: 22px;
+        display: flex;
+        justify-content: space-between;
+        font-size: 9px;
+        color: #5b8270;
+      }
+      .dot {
+        width: 4px;
+        height: 4px;
+        border-radius: 50%;
+        background: #7cd3a3;
+        display: inline-block;
+        margin-left: 5px;
+      }
+      .splash[data-theme="violet"] {
+        background: radial-gradient(ellipse at 50% 10%, #553e71, #1b192e 75%);
+      }
+      .splash[data-theme="ocean"] {
+        background: radial-gradient(ellipse at 50% 10%, #1b5272, #111e2f 75%);
+      }
+      .splash[data-theme="sunset"] {
+        background: radial-gradient(ellipse at 50% 10%, #704d31, #282124 75%);
+      }
+      .splash[data-theme="rose"] {
+        background: radial-gradient(ellipse at 50% 10%, #653c54, #291e2f 75%);
+      }
+      @keyframes travel {
+        0% {
+          transform: translateX(150%);
+        }
+        100% {
+          transform: translateX(-350%);
+        }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        .loader span {
+          animation: none;
+          width: 100%;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main class="splash" id="splash">
+      <span class="orbit"></span>
+      <div class="logo-shell">
+        <img
+          id="splash-logo"
+          src="../assets/hamshift.png"
+          alt="لوگوی شروع هم‌شیفت"
+        />
+      </div>
+      <h1>هم‌شیفت</h1>
+      <p>روزهای منظم‌تر، تیم همراه‌تر</p>
+      <div
+        class="loader"
+        role="progressbar"
+        aria-label="در حال آماده‌سازی برنامه"
+      >
+        <span></span>
+      </div>
+      <span class="state">در حال آماده‌سازی فضای کار شما…</span>
+      <div class="footer">
+        <span><i class="dot"></i>همیشه آفلاین، همیشه همراه</span
+        ><span>نسخهٔ ۲.۰</span>
+      </div>
+    </main>
+    <script src="splash.js"></script>
+  </body>
+</html>

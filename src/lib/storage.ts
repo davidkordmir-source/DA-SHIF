@@ -1,6 +1,7 @@
 import type { AppData } from "../types";
 import { generateSchedule } from "./scheduler";
 import { solar, todayKey } from "./calendar";
+import { validAppearance } from "./appearance";
 
 export const STORAGE_KEY = "hamshift:data:v1";
 export function initialData(): AppData {
@@ -46,11 +47,21 @@ export function initialData(): AppData {
   return { ...data, shifts: generateSchedule(data, j.jy, j.jm).shifts };
 }
 export function saveData(data: AppData) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+  const json = JSON.stringify(data);
+  if (typeof window !== "undefined" && window.desktop) {
+    const result = window.desktop.writeData(json);
+    if (!result.ok)
+      throw new Error(result.error || "ذخیرهٔ فایل داده‌ها انجام نشد.");
+  } else localStorage.setItem(STORAGE_KEY, json);
 }
 export function loadData(): { data: AppData; error?: string } {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
+    let raw: string | null;
+    if (typeof window !== "undefined" && window.desktop) {
+      const result = window.desktop.readData();
+      if (!result.ok) throw new Error(result.error);
+      raw = result.data || null;
+    } else raw = localStorage.getItem(STORAGE_KEY);
     return { data: raw ? validateBackup(JSON.parse(raw)) : initialData() };
   } catch {
     return {
@@ -68,6 +79,8 @@ export function validateBackup(value: unknown): AppData {
   };
   if (!value || typeof value !== "object") return fail();
   const d = value as AppData;
+  if (d.appearance !== undefined && !validAppearance(d.appearance))
+    return fail();
   if (
     d.version !== 1 ||
     typeof d.demo !== "boolean" ||

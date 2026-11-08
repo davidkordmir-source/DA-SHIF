@@ -48,4 +48,5 @@ export type AppData = {
   events: CustomEvent[];
   settings: Settings;
   schedulingWarnings?: Record<string, string[]>;
+  appearance?: import("./lib/appearance").Appearance;
 };
