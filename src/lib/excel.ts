@@ -192,11 +192,18 @@ export async function exportSchedule(data: AppData, dates: string[]) {
     "غیبت موجه",
     "غیبت غیرموجه",
     "حضور جایگزین",
+    "شیفت تعطیل پیش از این ماه",
+    "جمعه پیش از این ماه",
   ]);
   for (const p of data.people) {
     const s = personStats(
       p.id,
       data.shifts.filter((s) => dates.includes(s.date)),
+      data,
+    );
+    const prior = personStats(
+      p.id,
+      data.shifts.filter((s) => s.date < dates[0]),
       data,
     );
     report.addRow([
@@ -210,11 +217,14 @@ export async function exportSchedule(data: AppData, dates: string[]) {
       s.excused,
       s.unexcused,
       s.replacements,
+      prior.workloadHoliday,
+      prior.workloadFriday,
     ]);
   }
   styleSheet(report);
   const swaps = wb.addWorksheet("جابه‌جایی‌ها");
   swaps.addRow([
+    "نوع تغییر",
     "نفر اول",
     "تاریخ اول",
     "نفر دوم",
@@ -226,6 +236,7 @@ export async function exportSchedule(data: AppData, dates: string[]) {
     (s) => dates.includes(s.firstDate) || dates.includes(s.secondDate),
   ))
     swaps.addRow([
+      "جابه‌جایی شیفت",
       name(s.firstId),
       solarInput(s.firstDate),
       name(s.secondId),
@@ -233,6 +244,19 @@ export async function exportSchedule(data: AppData, dates: string[]) {
       s.note,
       s.createdAt,
     ]);
+  for (const change of (data.reserveChanges || []).filter((c) =>
+    dates.includes(c.date),
+  )) {
+    swaps.addRow([
+      "تغییر رزرو",
+      change.previousIds.map(name).join("، "),
+      solarInput(change.date),
+      change.nextIds.map(name).join("، "),
+      solarInput(change.date),
+      change.note,
+      change.createdAt,
+    ]);
+  }
   styleSheet(swaps);
   await writeWorkbook(
     wb,

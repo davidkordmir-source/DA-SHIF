@@ -194,6 +194,36 @@ export function validateBackup(value: unknown): AppData {
         return fail();
   }
   const swapIds = new Set<string>();
+  if (d.reserveChanges !== undefined) {
+    if (!Array.isArray(d.reserveChanges)) return fail();
+    const changeIds = new Set<string>();
+    for (const c of d.reserveChanges) {
+      if (
+        !c ||
+        typeof c.id !== "string" ||
+        !c.id ||
+        changeIds.has(c.id) ||
+        !dateOK(c.date) ||
+        !dates.has(c.date) ||
+        typeof c.createdAt !== "string" ||
+        isNaN(Date.parse(c.createdAt)) ||
+        typeof c.note !== "string" ||
+        !["manual", "attendance"].includes(c.source) ||
+        !Array.isArray(c.previousIds) ||
+        !Array.isArray(c.nextIds) ||
+        c.previousIds.length !== c.nextIds.length ||
+        !c.nextIds.length
+      )
+        return fail();
+      for (const roster of [c.previousIds, c.nextIds])
+        if (
+          new Set(roster).size !== roster.length ||
+          roster.some((id) => !ids.has(id))
+        )
+          return fail();
+      changeIds.add(c.id);
+    }
+  }
   for (const s of d.swaps) {
     if (
       !s ||

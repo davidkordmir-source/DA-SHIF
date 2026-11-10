@@ -57,12 +57,16 @@ export function generateSchedule(data: AppData, year: number, month: number) {
     data.shifts.some((s) => dateSet.has(s.date) && s.attendance.length) ||
     data.swaps.some(
       (s) => dateSet.has(s.firstDate) || dateSet.has(s.secondDate),
-    )
+    ) ||
+    data.reserveChanges?.some((change) => dateSet.has(change.date))
   )
     throw new Error(
-      "ماه دارای سوابق حضور، غیبت یا جابه‌جایی قابل بازتولید نیست.",
+      "ماه دارای سوابق حضور، غیبت، جابه‌جایی یا ویرایش رزرو قابل بازتولید نیست.",
     );
-  const history = data.shifts.filter((s) => !dateSet.has(s.date));
+  const retained = data.shifts.filter((s) => !dateSet.has(s.date));
+  // Only earlier dates contribute to fairness. Future plans remain protected
+  // by the rest constraints, but cannot distort the historical balance.
+  const history = retained.filter((s) => s.date < dates[0]);
   const active = data.people.filter((p) => p.active);
   const primaryPool = active.filter((p) => !p.reserveOnly);
   if (primaryPool.length < data.settings.primaryCount)
@@ -77,7 +81,7 @@ export function generateSchedule(data: AppData, year: number, month: number) {
     reserve: [],
     attendance: [],
   }));
-  const all = [...history, ...shifts];
+  const all = [...retained, ...shifts];
   const stats = new Map(
     active.map((p) => {
       const s = personStats(p.id, history, data);
@@ -89,6 +93,10 @@ export function generateSchedule(data: AppData, year: number, month: number) {
           holiday: s.workloadHoliday,
           friday: s.workloadFriday,
           weekdays: s.workloadWeekdays,
+          monthTotal: 0,
+          monthHoliday: 0,
+          monthFriday: 0,
+          monthWeekdays: Array(7).fill(0) as number[],
         },
       ];
     }),
@@ -125,32 +133,60 @@ export function generateSchedule(data: AppData, year: number, month: number) {
         warnings.push(
           `${shift.date}: فاصلهٔ استراحت برای یک نفر قابل رعایت نبود.`,
         );
-      const score = (p: Person) => {
+      const score = (p: Person): number[] => {
         const st = stats.get(p.id)!;
-        // Holiday equality has priority on holidays; total and weekday history
-        // keep normal days balanced. No random shuffle changes recorded results.
-        const balance = info.holiday
-          ? st.holiday * 120 +
-            st.friday * (info.friday ? 35 : 0) +
-            st.total * 18
-          : st.total * 100;
         const tie =
           ((Number(shift.date.replaceAll("-", "")) +
-            [...p.id].reduce((s, c) => s + c.charCodeAt(0), 0) * 31) %
+            [...p.id].reduce((n, c) => n + c.charCodeAt(0), 0) * 31) %
             97) /
           1000;
-        return balance + st.weekdays[day] * 12 + nearby(p).length * 10000 + tie;
+        // First keep this month's share even; use actual historical workload
+        // to rotate the remaining slots. A new staff member is never given all
+        // this month's holidays merely to catch up with years of older history.
+        return info.holiday
+          ? [
+              nearby(p).length,
+              st.monthHoliday,
+              info.friday ? st.monthFriday : 0,
+              info.friday ? st.friday : 0,
+              st.holiday,
+              st.monthWeekdays[day],
+              st.weekdays[day],
+              st.monthTotal,
+              st.total,
+              tie,
+            ]
+          : [
+              nearby(p).length,
+              st.monthTotal,
+              st.monthWeekdays[day],
+              st.weekdays[day],
+              st.total,
+              tie,
+            ];
       };
-      candidates.sort(
-        (a, b) => score(a) - score(b) || a.id.localeCompare(b.id),
-      );
+      candidates.sort((a, b) => {
+        const left = score(a),
+          right = score(b);
+        for (let i = 0; i < left.length; i++)
+          if (left[i] !== right[i]) return left[i] - right[i];
+        return a.id.localeCompare(b.id);
+      });
       const chosen = candidates[0];
       shift.primary.push(chosen.id);
       const st = stats.get(chosen.id)!;
       st.total++;
+      st.monthTotal++;
       st.weekdays[day]++;
-      if (info.holiday) st.holiday++;
-      if (info.friday) st.friday++;
+      st.monthWeekdays[day]++;
+      if (info.holiday) {
+        st.holiday++;
+        st.monthHoliday++;
+      }
+      if (info.friday) {
+        st.friday++;
+        st.monthFriday++;
+      }
     }
   }
   // Reserves are always distinct from the day's primary staff and each other.
@@ -174,7 +210,7 @@ export function generateSchedule(data: AppData, year: number, month: number) {
     }
   }
   return {
-    shifts: [...history, ...shifts].sort((a, b) =>
+    shifts: [...retained, ...shifts].sort((a, b) =>
       a.date.localeCompare(b.date),
     ),
     warnings,
@@ -302,6 +338,68 @@ export function applySwap(
   };
 }
 
+export function reserveDutyConflicts(
+  data: AppData,
+  date: string,
+  personId: string,
+) {
+  return data.shifts.filter(
+    (s) =>
+      s.date !== date &&
+      workingIds(s).includes(personId) &&
+      Math.abs(dayDistance(s.date, date)) <= data.settings.minRestDays,
+  );
+}
+
+export function updateReserves(
+  data: AppData,
+  date: string,
+  nextIds: string[],
+  note = "",
+  source: "manual" | "attendance" = "manual",
+): AppData {
+  const shift = data.shifts.find((s) => s.date === date);
+  if (!shift) throw new Error("این روز برنامهٔ شیفت ندارد.");
+  if (nextIds.length !== shift.reserve.length)
+    throw new Error(
+      "تعداد نفرات رزرو این روز باید ثابت بماند. برای هر جایگاه، یک نفر انتخاب کنید.",
+    );
+  if (new Set(nextIds).size !== nextIds.length || nextIds.some((id) => !id))
+    throw new Error("رزروهای روز باید افراد متفاوت باشند.");
+  for (const id of nextIds) {
+    const person = data.people.find((p) => p.id === id);
+    if (!person || (!person.active && !shift.reserve.includes(id)))
+      throw new Error("فقط از پرسنل فعال می‌توانید رزرو جدید انتخاب کنید.");
+    if (shift.primary.includes(id))
+      throw new Error("نیروی اصلی همین روز نمی‌تواند هم‌زمان رزرو باشد.");
+  }
+  for (const entry of shift.attendance) {
+    if (entry.replacementId && !nextIds.includes(entry.replacementId))
+      throw new Error(
+        "رزروی که حضور جایگزین او ثبت شده قابل حذف از این روز نیست؛ سوابق حضور باید حفظ شوند.",
+      );
+  }
+  if (nextIds.every((id) => shift.reserve.includes(id))) return data;
+  return {
+    ...data,
+    shifts: data.shifts.map((s) =>
+      s.date === date ? { ...s, reserve: [...nextIds] } : s,
+    ),
+    reserveChanges: [
+      {
+        id: crypto.randomUUID(),
+        createdAt: new Date().toISOString(),
+        date,
+        previousIds: [...shift.reserve],
+        nextIds: [...nextIds],
+        note: note.trim().slice(0, 500),
+        source,
+      },
+      ...(data.reserveChanges || []),
+    ],
+  };
+}
+
 export function recordAttendance(
   data: AppData,
   date: string,
@@ -309,15 +407,29 @@ export function recordAttendance(
   status: AttendanceStatus,
   note: string,
   replacementId?: string,
+  releaseReserveId?: string,
 ): AppData {
-  const shift = data.shifts.find((s) => s.date === date);
+  let shift = data.shifts.find((s) => s.date === date);
   if (!shift?.primary.includes(personId))
     throw new Error("فرد انتخاب‌شده در این روز شیفت ندارد.");
-  if (
-    replacementId &&
-    (status === "present" || !shift.reserve.includes(replacementId))
-  )
-    throw new Error("جایگزین باید از فهرست رزرو همین روز انتخاب شود.");
+  if (replacementId && status === "present")
+    throw new Error("برای فرد حاضر نمی‌توان جایگزین ثبت کرد.");
+  if (replacementId && !shift.reserve.includes(replacementId)) {
+    if (!releaseReserveId || !shift.reserve.includes(releaseReserveId))
+      throw new Error(
+        "برای انتخاب فردی خارج از رزروهای فعلی، مشخص کنید جای کدام رزرو قرار بگیرد.",
+      );
+    const absentName =
+      data.people.find((p) => p.id === personId)?.name || personId;
+    data = updateReserves(
+      data,
+      date,
+      shift.reserve.map((id) => (id === releaseReserveId ? replacementId : id)),
+      `انتخاب جایگزین دستی برای ${absentName}${note.trim() ? `؛ ${note.trim()}` : ""}`,
+      "attendance",
+    );
+    shift = data.shifts.find((s) => s.date === date)!;
+  }
   if (
     replacementId &&
     shift.attendance.some(
@@ -327,12 +439,7 @@ export function recordAttendance(
     throw new Error("این نیروی رزرو قبلاً جایگزین شده است.");
   if (
     replacementId &&
-    data.shifts.some(
-      (s) =>
-        s.date !== date &&
-        workingIds(s).includes(replacementId) &&
-        Math.abs(dayDistance(s.date, date)) <= data.settings.minRestDays,
-    )
+    reserveDutyConflicts(data, date, replacementId).length > 0
   )
     throw new Error(
       "نیروی رزرو انتخاب‌شده با حداقل فاصلهٔ استراحت تداخل دارد. رزرو دیگری انتخاب کنید.",

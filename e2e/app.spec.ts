@@ -59,14 +59,12 @@ test("Excel import, generation, export, attendance, swaps, and backup work", asy
     sheet.addRow([String(2001 + i), `همکار آزمایشی ${i + 1}`, "عملیات", "خیر"]);
   const buffer = Buffer.from(await wb.xlsx.writeBuffer());
   await page.getByRole("button", { name: "ورود پرسنل از اکسل" }).click();
-  await page
-    .locator("input[type=file]")
-    .setInputFiles({
-      name: "team.xlsx",
-      mimeType:
-        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-      buffer,
-    });
+  await page.locator("input[type=file]").setInputFiles({
+    name: "team.xlsx",
+    mimeType:
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    buffer,
+  });
   await expect(page.getByRole("dialog")).toContainText("پیش‌نمایش پرسنل");
   await page.getByRole("button", { name: /تأیید ورود/ }).click();
   expect((await getData(page)).people).toHaveLength(12);
@@ -116,7 +114,7 @@ test("Excel import, generation, export, attendance, swaps, and backup work", asy
     .click();
   await page.getByText("غیبت موجه", { exact: true }).click();
   await page
-    .getByLabel("جایگزین از رزرو همین روز")
+    .getByLabel("انتخاب جایگزین از پرسنل")
     .selectOption(swapped.shifts[0].reserve[0]);
   await page.getByLabel("توضیحات (اختیاری)").fill("مرخصی پزشکی");
   await page.getByRole("button", { name: "ذخیرهٔ وضعیت" }).click();

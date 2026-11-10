@@ -1,5 +1,5 @@
-import lunarData from "../data/iran-lunar.json";
-import eventsData from "../data/iran-events.json";
+import lunarData from "../data/iran-lunar.json" with { type: "json" };
+import eventsData from "../data/iran-events.json" with { type: "json" };
 
 export const CALENDAR_REVISION = lunarData.revision;
 export const CALENDAR_UPDATED_AT = lunarData.updatedAt;

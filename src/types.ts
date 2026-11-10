@@ -27,6 +27,15 @@ export type Swap = {
   secondId: string;
   note: string;
 };
+export type ReserveChange = {
+  id: string;
+  createdAt: string;
+  date: string;
+  previousIds: string[];
+  nextIds: string[];
+  note: string;
+  source: "manual" | "attendance";
+};
 export type CustomEvent = {
   date: string;
   title: string;
@@ -45,6 +54,7 @@ export type AppData = {
   people: Person[];
   shifts: Shift[];
   swaps: Swap[];
+  reserveChanges?: ReserveChange[];
   events: CustomEvent[];
   settings: Settings;
   schedulingWarnings?: Record<string, string[]>;

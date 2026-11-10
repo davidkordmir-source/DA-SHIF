@@ -82,6 +82,7 @@ import { loadData, saveData, validateBackup } from "./lib/storage";
 
 import logo from "../assets/hamshift.svg";
 import { AppearancePanel } from "./AppearancePanel";
+import { ReserveEditor, ReserveHistory } from "./ReserveEditor";
 import { defaultAppearance, themes } from "./lib/appearance";
 import { hasIranCalendar, CALENDAR_ANNUAL_YEAR } from "./lib/iran-calendar";
 import { useToday } from "./lib/use-today";
@@ -100,6 +101,7 @@ type Dialog =
   | "generate"
   | "swap"
   | "attendance"
+  | "reserve"
   | "person"
   | "help"
   | "event"
@@ -178,6 +180,8 @@ export default function App() {
     note: "",
     replacementId: "",
   });
+  const [reserveEditDate, setReserveEditDate] = useState(today);
+  const [releaseReserveId, setReleaseReserveId] = useState("");
   const [personForm, setPersonForm] = useState({
     id: "",
     name: "",
@@ -309,6 +313,7 @@ export default function App() {
     open("profile");
   };
   const startAttendance = (date: string, id: string) => {
+    setReleaseReserveId("");
     const a = data.shifts
       .find((s) => s.date === date)
       ?.attendance.find((a) => a.personId === id);
@@ -331,6 +336,13 @@ export default function App() {
     });
     open("swap");
   };
+  const startReserveEdit = (requested = selectedDate) => {
+    const date = data.shifts.some((s) => s.date === requested)
+      ? requested
+      : monthShifts[0]?.date || data.shifts[0]?.date || requested;
+    setReserveEditDate(date);
+    open("reserve");
+  };
   const startEvent = (date = selectedDate, index: number | null = null) => {
     const e = index !== null ? data.events[index] : null;
     setEventEditing(index);
@@ -348,10 +360,11 @@ export default function App() {
         monthShifts.some((s) => s.attendance.length) ||
         data.swaps.some(
           (s) => dates.includes(s.firstDate) || dates.includes(s.secondDate),
-        )
+        ) ||
+        data.reserveChanges?.some((c) => dates.includes(c.date))
       )
         throw new Error(
-          "این ماه سابقهٔ حضور، غیبت یا جابه‌جایی دارد. برای حفظ سوابق، بازتولید مجاز نیست. ماه دیگری انتخاب کنید.",
+          "این ماه سابقهٔ حضور، غیبت، جابه‌جایی یا ویرایش رزرو دارد. برای حفظ سوابق، بازتولید مجاز نیست. ماه دیگری انتخاب کنید.",
         );
       const result = generateSchedule(data, year, month);
       if (
@@ -411,7 +424,9 @@ export default function App() {
       ...data,
       people,
       demo: false,
-      ...(data.demo ? { shifts: [], swaps: [], schedulingWarnings: {} } : {}),
+      ...(data.demo
+        ? { shifts: [], swaps: [], reserveChanges: [], schedulingWarnings: {} }
+        : {}),
     };
     if (
       commit(
@@ -525,6 +540,28 @@ export default function App() {
         ),
     );
   const profilePerson = person(personId);
+  const attendanceShift = data.shifts.find(
+    (s) => s.date === attendanceForm.date,
+  );
+  const outsideReserve =
+    !!attendanceForm.replacementId &&
+    !!attendanceShift &&
+    !attendanceShift.reserve.includes(attendanceForm.replacementId);
+  const priorShifts = useMemo(
+    () => data.shifts.filter((s) => s.date < dates[0]),
+    [data.shifts, dates],
+  );
+  const priorMonthCount = useMemo(
+    () => new Set(priorShifts.map((s) => solarInput(s.date).slice(0, 7))).size,
+    [priorShifts],
+  );
+  const priorStats = useMemo(
+    () =>
+      new Map(
+        data.people.map((p) => [p.id, personStats(p.id, priorShifts, data)]),
+      ),
+    [data.people, priorShifts, data.settings, data.events],
+  );
 
   return (
     <div className="app-shell">
@@ -619,7 +656,7 @@ export default function App() {
               <b>مدیر سیستم</b>
               <small>فضای کاری شخصی</small>
             </div>
-            <span className="version">۲.۱</span>
+            <span className="version">۲.۲</span>
           </div>
         </div>
       </aside>
@@ -741,9 +778,32 @@ export default function App() {
                   <Plus size={18} />
                   ثبت جابه‌جایی
                 </button>
-              ) : page === "reports" ||
-                page === "reserves" ||
-                page === "attendance" ? (
+              ) : page === "reserves" ? (
+                <>
+                  <button
+                    className="button button-primary"
+                    onClick={() =>
+                      startReserveEdit(
+                        monthShifts.find((s) => s.date === selectedDate)
+                          ?.date ||
+                          monthShifts[0]?.date ||
+                          selectedDate,
+                      )
+                    }
+                  >
+                    <ShieldCheck size={17} />
+                    ویرایش رزروهای روز
+                  </button>
+                  <button
+                    className="button button-secondary"
+                    disabled={busy}
+                    onClick={handleExport}
+                  >
+                    <ArrowDownToLine size={17} />
+                    خروجی اکسل
+                  </button>
+                </>
+              ) : page === "reports" || page === "attendance" ? (
                 <button
                   className="button button-secondary"
                   disabled={busy}
@@ -1329,7 +1389,7 @@ export default function App() {
               <Notice>
                 {page === "attendance"
                   ? "حضور به‌صورت خودکار فرض نمی‌شود. برای هر نفر وضعیت را ثبت کنید؛ در صورت غیبت، می‌توانید نیروی رزرو همان روز را جایگزین کنید."
-                  : "هر روز دو نیروی رزرو مجزا دارد. جایگزینی واقعی از بخش حضور و غیاب ثبت می‌شود و نام فرد غایب در سوابق باقی می‌ماند."}
+                  : "رزرو هر روز را می‌توانید از همهٔ پرسنل فعال انتخاب و ویرایش کنید. از «ویرایش رزروهای روز» استفاده کنید؛ هنگام ثبت غیبت هم انتخاب فردی خارج از رزروهای فعلی ممکن است."}
               </Notice>
               {monthShifts.length ? (
                 <div className="table-scroll">
@@ -1440,6 +1500,15 @@ export default function App() {
                                       : "جزئیات روز"}
                                     <ChevronLeft size={14} />
                                   </button>
+                                  {page === "reserves" && (
+                                    <button
+                                      className="text-button"
+                                      onClick={() => startReserveEdit(s.date)}
+                                      style={{ marginInlineStart: 16 }}
+                                    >
+                                      تغییر رزرو
+                                    </button>
+                                  )}
                                 </td>
                               </tr>
                             );
@@ -1465,6 +1534,14 @@ export default function App() {
                   }
                 />
               )}
+              {page === "reserves" && (
+                <ReserveHistory
+                  changes={(data.reserveChanges || []).filter((c) =>
+                    dates.includes(c.date),
+                  )}
+                  name={name}
+                />
+              )}
             </section>
           )}
 
@@ -1478,9 +1555,12 @@ export default function App() {
                     دریافت‌اند.
                   </p>
                 </div>
-                <Badge tone="gray">{fa(data.swaps.length)} جابه‌جایی</Badge>
+                <Badge tone="gray">
+                  {fa(data.swaps.length + (data.reserveChanges?.length || 0))}{" "}
+                  تغییر
+                </Badge>
               </div>
-              {data.swaps.length ? (
+              {data.swaps.length || data.reserveChanges?.length ? (
                 <div className="swap-list">
                   {data.swaps.map((s) => (
                     <article className="swap-record" key={s.id}>
@@ -1527,6 +1607,7 @@ export default function App() {
                   }
                 />
               )}
+              <ReserveHistory changes={data.reserveChanges || []} name={name} />
             </section>
           )}
 
@@ -1587,12 +1668,22 @@ export default function App() {
                   تعداد نفرات می‌تواند اختلاف ایجاد کند. سابقهٔ ماه‌های
                   ذخیره‌شده و حضور جایگزین‌ها در برنامه‌ریزی آینده لحاظ می‌شود.
                 </Notice>
+                <Notice>
+                  سابقهٔ پیش از این ماه: {fa(priorMonthCount)} ماه و{" "}
+                  {fa(priorShifts.length)} روز برنامهٔ ذخیره‌شده. ستون‌های
+                  «تعطیل قبلی» و «جمعه قبلی» بار کاری قبلی را با احتساب
+                  جایگزین‌ها و کسر غیبت ثبت‌شده نشان می‌دهند. هر ماه نیز جداگانه
+                  متعادل می‌شود تا یک نفر برای جبران سابقه، همهٔ تعطیلات ماه را
+                  نگیرد.
+                </Notice>
                 <div className="table-scroll">
                   <table className="report-table">
                     <thead>
                       <tr>
                         <th>پرسنل</th>
-                        <th>کل</th>
+                        <th>تعطیل قبلی</th>
+                        <th>جمعه قبلی</th>
+                        <th>کل این ماه</th>
                         <th>عادی</th>
                         <th>تعطیل</th>
                         <th>رزرو</th>
@@ -1612,6 +1703,12 @@ export default function App() {
                               <Avatar person={p} index={i} small />
                               <strong>{p.name}</strong>
                             </button>
+                          </td>
+                          <td>
+                            {fa(priorStats.get(p.id)?.workloadHoliday || 0)}
+                          </td>
+                          <td>
+                            {fa(priorStats.get(p.id)?.workloadFriday || 0)}
                           </td>
                           <td>
                             <b>{fa(p.stats.total)}</b>
@@ -1904,6 +2001,10 @@ export default function App() {
               setDetailOpen(false);
               startSwap(selectedDate);
             }}
+            reserves={() => {
+              setDetailOpen(false);
+              startReserveEdit(selectedDate);
+            }}
             event={() => {
               setDetailOpen(false);
               startEvent(selectedDate);
@@ -1912,6 +2013,16 @@ export default function App() {
         </div>
       )}
 
+      {dialog === "reserve" && (
+        <ReserveEditor
+          data={data}
+          initialDate={reserveEditDate}
+          onSave={(next) =>
+            commit(next, "رزروهای روز ذخیره شدند و تغییرات در تاریخچه ثبت شد.")
+          }
+          onClose={close}
+        />
+      )}
       {dialog === "generate" && (
         <Modal
           title="ایجاد برنامهٔ عادلانه"
@@ -2372,6 +2483,7 @@ export default function App() {
                       attendanceForm.status,
                       attendanceForm.note,
                       attendanceForm.replacementId || undefined,
+                      releaseReserveId || undefined,
                     ),
                     "وضعیت حضور و غیاب ذخیره شد.",
                   )
@@ -2415,29 +2527,90 @@ export default function App() {
                 )}
               </div>
               {attendanceForm.status !== "present" && (
-                <Field
-                  label="جایگزین از رزرو همین روز"
-                  hint="انتخاب جایگزین اختیاری است؛ یک رزرو نمی‌تواند هم‌زمان جای دو نفر باشد."
-                >
-                  <Select
-                    value={attendanceForm.replacementId}
-                    onChange={(e) =>
-                      setAttendanceForm({
-                        ...attendanceForm,
-                        replacementId: e.target.value,
-                      })
-                    }
+                <>
+                  <Field
+                    label="انتخاب جایگزین از پرسنل"
+                    hint="می‌توانید رزروهای فعلی یا فرد دیگری از همهٔ پرسنل فعال را انتخاب کنید."
                   >
-                    <option value="">بدون جایگزین</option>
-                    {data.shifts
-                      .find((s) => s.date === attendanceForm.date)
-                      ?.reserve.map((id) => (
-                        <option key={id} value={id}>
-                          {name(id)}
-                        </option>
-                      ))}
-                  </Select>
-                </Field>
+                    <Select
+                      value={attendanceForm.replacementId}
+                      onChange={(e) => {
+                        setAttendanceForm({
+                          ...attendanceForm,
+                          replacementId: e.target.value,
+                        });
+                        setReleaseReserveId("");
+                        setError("");
+                      }}
+                    >
+                      <option value="">بدون جایگزین</option>
+                      <optgroup label="رزروهای این روز">
+                        {attendanceShift?.reserve.map((id) => (
+                          <option
+                            key={id}
+                            value={id}
+                            disabled={attendanceShift.attendance.some(
+                              (a) =>
+                                a.personId !== attendanceForm.personId &&
+                                a.replacementId === id,
+                            )}
+                          >
+                            {name(id)}
+                          </option>
+                        ))}
+                      </optgroup>
+                      <optgroup label="سایر پرسنل فعال">
+                        {activePeople
+                          .filter(
+                            (p) =>
+                              attendanceShift &&
+                              !attendanceShift.primary.includes(p.id) &&
+                              !attendanceShift.reserve.includes(p.id),
+                          )
+                          .map((p) => (
+                            <option key={p.id} value={p.id}>
+                              {p.name}
+                              {p.department ? ` (${p.department})` : ""}
+                            </option>
+                          ))}
+                      </optgroup>
+                    </Select>
+                  </Field>
+                  {outsideReserve && (
+                    <>
+                      <Notice>
+                        این فرد در رزروهای فعلی نیست. مشخص کنید جای کدام رزرو
+                        قرار بگیرد؛ ویرایش رزرو و ثبت غیبت با هم ذخیره می‌شوند.
+                        فرد دارای حضور جایگزین ثبت‌شده حذف نمی‌شود.
+                      </Notice>
+                      <Field label="جای کدام رزرو قرار بگیرد؟">
+                        <Select
+                          required
+                          value={releaseReserveId}
+                          onChange={(e) => setReleaseReserveId(e.target.value)}
+                        >
+                          <option value="">انتخاب رزرو قبلی</option>
+                          {attendanceShift?.reserve.map((id) => (
+                            <option
+                              key={id}
+                              value={id}
+                              disabled={attendanceShift.attendance.some(
+                                (a) => a.replacementId === id,
+                              )}
+                            >
+                              {name(id)}
+                              {attendanceShift.attendance.some(
+                                (a) => a.replacementId === id,
+                              )
+                                ? " — حضور جایگزین ثبت‌شده"
+                                : ""}
+                            </option>
+                          ))}
+                        </Select>
+                      </Field>
+                    </>
+                  )}
+                </>
               )}
               <Field label="توضیحات (اختیاری)">
                 <textarea
@@ -2843,6 +3016,7 @@ function DayDrawer({
   profile,
   attendance,
   swap,
+  reserves,
   event,
 }: {
   date: string;
@@ -2852,6 +3026,7 @@ function DayDrawer({
   profile: (id: string) => void;
   attendance: (date: string, id: string) => void;
   swap: () => void;
+  reserves: () => void;
   event: () => void;
 }) {
   const shift = data.shifts.find((s) => s.date === date),
@@ -2932,11 +3107,17 @@ function DayDrawer({
                 </div>
               );
             })}
-            <h3 className="small-title">
-              <span className="little-dot gray" />
-              نیروهای رزرو{" "}
-              <Badge tone="gray">{fa(shift.reserve.length)} نفر</Badge>
-            </h3>
+            <div className="reserve-day-heading">
+              <h3 className="small-title">
+                <span className="little-dot gray" />
+                نیروهای رزرو{" "}
+                <Badge tone="gray">{fa(shift.reserve.length)} نفر</Badge>
+              </h3>
+              <button className="text-button" onClick={reserves}>
+                <ShieldCheck size={15} />
+                ویرایش رزروهای روز
+              </button>
+            </div>
             {shift.reserve.map((id) => (
               <div className="day-person" key={id}>
                 <button className="person-cell" onClick={() => profile(id)}>
@@ -2956,6 +3137,14 @@ function DayDrawer({
                 <Badge tone="gray">رزرو</Badge>
               </div>
             ))}
+            <div className="reserve-history-in-day">
+              <ReserveHistory
+                changes={(data.reserveChanges || []).filter(
+                  (c) => c.date === date,
+                )}
+                name={name}
+              />
+            </div>
             {data.swaps
               .filter((s) => s.firstDate === date || s.secondDate === date)
               .map((s) => (
