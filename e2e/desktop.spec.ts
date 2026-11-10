@@ -1,4 +1,5 @@
 import { _electron as electron, test, expect } from "@playwright/test";
+import { themes, fonts } from "../src/lib/appearance";
 import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
@@ -125,43 +126,51 @@ test("native shell loads the custom splash and persists selected themes and font
   }
 });
 
-test("all six themes and three bundled fonts can be selected and survive reload", async ({
+test("fourteen different theme designs and eight real Persian fonts work offline and persist", async ({
   page,
 }) => {
+  const errors: string[] = [];
+  page.on("pageerror", (e) => errors.push(e.message));
   await page.goto("/");
   await page.getByRole("button", { name: "تنظیمات", exact: true }).click();
-  for (const [id, name] of [
-    ["emerald", "باغ زمرد"],
-    ["violet", "یاس بنفش"],
-    ["ocean", "آبی اقیانوس"],
-    ["sunset", "غروب طلایی"],
-    ["rose", "شکوفهٔ رز"],
-    ["midnight", "شب آرام"],
-  ]) {
-    await page.getByRole("button", { name: `تم ${name}`, exact: true }).click();
-    await expect(page.locator("html")).toHaveAttribute("data-theme", id);
-  }
-  for (const name of ["وزیرمتن", "استعداد", "نوتو عربی"]) {
+  for (const theme of themes) {
     await page
-      .getByRole("button", { name: `فونت ${name}`, exact: true })
+      .getByRole("button", { name: `تم ${theme.name}`, exact: true })
       .click();
+    await expect(page.locator("html")).toHaveAttribute("data-theme", theme.id);
     expect(
-      await page.evaluate(() =>
-        document.fonts.check(
-          '12px "' +
-            (
-              {
-                vazirmatn: "Vazirmatn Variable",
-                estedad: "Estedad Variable",
-                noto: "Noto Sans Arabic Variable",
-              } as Record<string, string>
-            )[document.documentElement.dataset.font!] +
-            '"',
-        ),
+      await page.evaluate(
+        () => document.documentElement.scrollWidth <= innerWidth,
       ),
+    ).toBe(true);
+    await expect(
+      page.getByRole("button", { name: `تم ${theme.name}`, exact: true }),
+    ).toHaveAttribute("aria-pressed", "true");
+  }
+  await page
+    .getByLabel("متن دلخواه برای مقایسهٔ فونت‌ها")
+    .fill("پژوهش، چابکی، روزهای بهتر");
+  await expect(page.locator(".font-sample").first()).toHaveText(
+    "پژوهش، چابکی، روزهای بهتر",
+  );
+  for (const font of fonts) {
+    await page
+      .getByRole("button", { name: `فونت ${font.name}`, exact: true })
+      .click();
+    const loaded = await page.evaluate(async (family) => {
+      const faces = await document.fonts.load(
+        `14px "${family}"`,
+        "پژوهش، چابکی، روزهای بهتر",
+      );
+      return faces.length > 0 && faces.every((f) => f.status === "loaded");
+    }, font.family);
+    expect(
+      loaded,
+      `Bundled font ${font.name} should actually load Persian glyphs`,
     ).toBe(true);
   }
   await page.reload();
-  await expect(page.locator("html")).toHaveAttribute("data-theme", "midnight");
-  await expect(page.locator("html")).toHaveAttribute("data-font", "noto");
+  await expect(page.locator("html")).toHaveAttribute("data-theme", "terminal");
+  await expect(page.locator("html")).toHaveAttribute("data-font", "amiri");
+  expect(errors).toEqual([]);
 });

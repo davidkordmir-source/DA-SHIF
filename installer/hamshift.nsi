@@ -7,7 +7,7 @@ Unicode true
   !error "PROJECT_ROOT is required"
 !endif
 !ifndef APP_VERSION
-  !define APP_VERSION "2.0.0"
+  !define APP_VERSION "2.1.0"
 !endif
 Name "هم‌شیفت"
 OutFile "${PROJECT_ROOT}/out/Hamshift-Setup-${APP_VERSION}-x64.exe"

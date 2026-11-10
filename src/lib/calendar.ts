@@ -1,5 +1,6 @@
 import jalaali from "jalaali-js";
 import type { CustomEvent } from "../types";
+import { iranLunar, IRAN_EVENTS } from "./iran-calendar";
 
 export const fa = (value: number | string) =>
   String(value).replace(/\d/g, (d) => "۰۱۲۳۴۵۶۷۸۹"[+d]);
@@ -97,6 +98,8 @@ export function parseSolarInput(value: string) {
   return fromSolar(parts[0], parts[1], parts[2]);
 }
 export function lunar(date: string, offset = 0) {
+  const published = iranLunar(date);
+  if (published) return published;
   const d = parseDate(date);
   d.setUTCDate(d.getUTCDate() + offset);
   const parts = new Intl.DateTimeFormat("en-u-ca-islamic-civil", {
@@ -124,53 +127,6 @@ export function gregorianLabel(date: string) {
   }).format(parseDate(date));
 }
 
-type RecurringEvent = [number, number, string, boolean];
-const solarEvents: RecurringEvent[] = [
-  [1, 1, "آغاز نوروز", true],
-  [1, 2, "عید نوروز", true],
-  [1, 3, "عید نوروز", true],
-  [1, 4, "عید نوروز", true],
-  [1, 12, "روز جمهوری اسلامی", true],
-  [1, 13, "روز طبیعت", true],
-  [2, 1, "روز بزرگداشت سعدی", false],
-  [2, 12, "روز معلم", false],
-  [3, 14, "رحلت امام خمینی", true],
-  [3, 15, "قیام ۱۵ خرداد", true],
-  [4, 1, "روز اصناف", false],
-  [6, 1, "روز پزشک", false],
-  [6, 4, "روز کارمند", false],
-  [7, 1, "آغاز سال تحصیلی", false],
-  [7, 20, "روز بزرگداشت حافظ", false],
-  [8, 13, "روز دانش‌آموز", false],
-  [8, 24, "روز کتاب و کتاب‌خوانی", false],
-  [9, 16, "روز دانشجو", false],
-  [9, 30, "شب یلدا", false],
-  [10, 5, "روز ایمنی در برابر زلزله", false],
-  [11, 22, "پیروزی انقلاب اسلامی", true],
-  [12, 5, "روز مهندس", false],
-  [12, 15, "روز درختکاری", false],
-  [12, 29, "ملی شدن صنعت نفت", true],
-];
-const lunarEvents: RecurringEvent[] = [
-  [1, 9, "تاسوعای حسینی", true],
-  [1, 10, "عاشورای حسینی", true],
-  [2, 20, "اربعین حسینی", true],
-  [2, 28, "رحلت پیامبر و شهادت امام حسن", true],
-  [2, 30, "شهادت امام رضا", true],
-  [3, 8, "شهادت امام حسن عسکری", true],
-  [3, 17, "میلاد پیامبر و امام جعفر صادق", true],
-  [6, 3, "شهادت حضرت فاطمه", true],
-  [7, 13, "ولادت امام علی و روز پدر", true],
-  [7, 27, "مبعث پیامبر", true],
-  [8, 15, "ولادت حضرت مهدی", true],
-  [9, 21, "شهادت امام علی", true],
-  [10, 1, "عید فطر", true],
-  [10, 2, "تعطیل عید فطر", true],
-  [10, 25, "شهادت امام جعفر صادق", true],
-  [12, 10, "عید قربان", true],
-  [12, 18, "عید غدیر خم", true],
-  [6, 20, "ولادت حضرت فاطمه و روز مادر", false],
-];
 export function eventsFor(
   date: string,
   custom: CustomEvent[] = [],
@@ -178,26 +134,80 @@ export function eventsFor(
 ) {
   const j = solar(date),
     h = lunar(date, offset);
-  const lastSafar =
-    h.month === 2 &&
-    h.day === 29 &&
-    lunar(dateKey(new Date(parseDate(date).getTime() + 86400000)), offset)
-      .month === 3;
-  const events = [
-    ...solarEvents
-      .filter((e) => e[0] === j.jm && e[1] === j.jd)
-      .map((e) => ({ title: e[2], holiday: e[3], source: "solar" })),
-    ...lunarEvents
-      .filter(
-        (e) =>
-          e[0] === h.month &&
-          (e[1] === h.day || (e[0] === 2 && e[1] === 30 && lastSafar)),
-      )
-      .map((e) => ({ title: e[2], holiday: e[3], source: "lunar" })),
+  const g = {
+    year: Number(date.slice(0, 4)),
+    month: Number(date.slice(5, 7)),
+    day: Number(date.slice(8, 10)),
+  };
+  const add = (days: number) =>
+    dateKey(new Date(parseDate(date).getTime() + days * 86400000));
+  const tuple = (calendar: string, key: string = date) => {
+    if (calendar === "Hijri") return key === date ? h : lunar(key, offset);
+    if (calendar === "Gregorian")
+      return key === date
+        ? g
+        : {
+            year: Number(key.slice(0, 4)),
+            month: Number(key.slice(5, 7)),
+            day: Number(key.slice(8, 10)),
+          };
+    const p = key === date ? j : solar(key);
+    return { year: p.jy, month: p.jm, day: p.jd };
+  };
+  const events = IRAN_EVENTS.filter((event) => {
+    if ("fromYear" in event && event.fromYear && j.jy < event.fromYear)
+      return false;
+    const t = tuple(event.calendar);
+    if (event.rule === "simple")
+      return t.month === event.month && t.day === event.day;
+    if (event.rule === "single event")
+      return (
+        t.year === event.year && t.month === event.month && t.day === event.day
+      );
+    if (event.rule === "end of month")
+      return (
+        t.month === event.month &&
+        tuple(event.calendar, add(1)).month !== t.month
+      );
+    if (event.rule === "nth weekday of month")
+      return (
+        t.month === event.month &&
+        dayOfWeek(date) === event.weekday &&
+        Math.ceil(t.day / 7) === event.nth
+      );
+    if (event.rule === "last weekday of month") {
+      const reference = add(-(event.offset || 0));
+      const r = tuple(event.calendar, reference);
+      return (
+        r.month === event.month &&
+        dayOfWeek(reference) === event.weekday &&
+        tuple(
+          event.calendar,
+          dateKey(new Date(parseDate(reference).getTime() + 7 * 86400000)),
+        ).month !== r.month
+      );
+    }
+    return false;
+  }).map((event) => ({
+    title: event.title,
+    holiday: event.holiday,
+    source:
+      event.calendar === "Hijri"
+        ? "lunar"
+        : event.calendar === "Gregorian"
+          ? "gregorian"
+          : "solar",
+  }));
+  events.sort((a, b) => Number(b.holiday) - Number(a.holiday));
+  events.push(
     ...custom
-      .filter((e) => e.date === date)
-      .map((e) => ({ title: e.title, holiday: e.holiday, source: "custom" })),
-  ];
+      .filter((event) => event.date === date)
+      .map((event) => ({
+        title: event.title,
+        holiday: event.holiday,
+        source: "custom",
+      })),
+  );
   const override = custom.filter((e) => e.date === date && e.override).at(-1);
   return {
     events,

@@ -1,0 +1,25 @@
+{
+  "revision": "iran-1405.2026-11-09",
+  "checkedOn": "2026-11-09",
+  "primaryAnnualCalendar": "https://calendar.ut.ac.ir/documents/2139738/7092644/Calendar-1405.pdf",
+  "sources": [
+    {
+      "repository": "https://github.com/roozbehp/qamari",
+      "commit": "575d275ef169c0a18012506d473ba1008a1c10d0",
+      "path": "consolidated.txt",
+      "sha256": "c4f3abc839942f6928d72a1e0dc8ca217007b81d3ad5f50f22b56544f3759553"
+    },
+    {
+      "repository": "https://github.com/persian-calendar/events",
+      "commit": "503bb203ac50a0ca79f36840ef74e1eee7eabb1d",
+      "path": "events.json",
+      "sha256": "36d65430b78c2cc41f0fffd35aed7b05af74e17407184621211f638fce3841d7"
+    },
+    {
+      "repository": "https://github.com/persian-calendar/calendar",
+      "commit": "80612989798e838b42d7158f259bc96590ca1285",
+      "path": "src/commonTest/kotlin/io/github/persiancalendar/calendar/MainTests.kt",
+      "sha256": "ba322a6469863a9bb5e8a95076831c8d174127236c7102fba0401c5e379c0e43"
+    }
+  ]
+}

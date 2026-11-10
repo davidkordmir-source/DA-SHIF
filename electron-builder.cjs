@@ -14,6 +14,7 @@ module.exports = {
     "assets/hamshift.ico",
     "assets/vazirmatn.woff2",
     "assets/font-licenses/**",
+    "assets/calendar-licenses/**",
     "!node_modules/**",
   ],
   electronLanguages: ["en-US", "fa"],

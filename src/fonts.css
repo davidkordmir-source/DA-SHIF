@@ -1,0 +1,107 @@
+/* Unmodified, locally bundled Arabic fonts; no font requests leave this app. */
+@font-face {
+  font-family: "Vazirmatn Variable";
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+  src: url("@fontsource-variable/vazirmatn/files/vazirmatn-arabic-wght-normal.woff2")
+    format("woff2");
+  unicode-range:
+    U+0600-06FF, U+0750-077F, U+08A0-08FF, U+200C-200F, U+FB50-FDFF, U+FE70-FEFF;
+}
+@font-face {
+  font-family: "Vazirmatn Variable";
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+  src: url("@fontsource-variable/vazirmatn/files/vazirmatn-latin-wght-normal.woff2")
+    format("woff2");
+  unicode-range: U+0000-00FF, U+2000-206F;
+}
+@font-face {
+  font-family: "Estedad Variable";
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+  src: url("@fontsource-variable/estedad/files/estedad-arabic-wght-normal.woff2")
+    format("woff2");
+}
+@font-face {
+  font-family: "Noto Sans Arabic Variable";
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+  src: url("@fontsource-variable/noto-sans-arabic/files/noto-sans-arabic-arabic-wght-normal.woff2")
+    format("woff2");
+}
+@font-face {
+  font-family: "Readex Pro Variable";
+  font-style: normal;
+  font-weight: 160 700;
+  font-display: swap;
+  src: url("@fontsource-variable/readex-pro/files/readex-pro-arabic-wght-normal.woff2")
+    format("woff2");
+}
+@font-face {
+  font-family: "Lalezar";
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("@fontsource/lalezar/files/lalezar-arabic-400-normal.woff2")
+    format("woff2");
+}
+@font-face {
+  font-family: "Markazi Text Variable";
+  size-adjust: 132%;
+  font-style: normal;
+  font-weight: 400 700;
+  font-display: swap;
+  src: url("@fontsource-variable/markazi-text/files/markazi-text-arabic-wght-normal.woff2")
+    format("woff2");
+}
+@font-face {
+  font-family: "Baloo Bhaijaan 2 Variable";
+  font-style: normal;
+  font-weight: 400 800;
+  font-display: swap;
+  src: url("@fontsource-variable/baloo-bhaijaan-2/files/baloo-bhaijaan-2-arabic-wght-normal.woff2")
+    format("woff2");
+}
+@font-face {
+  font-family: "Amiri";
+  size-adjust: 118%;
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("@fontsource/amiri/files/amiri-arabic-400-normal.woff2")
+    format("woff2");
+}
+@font-face {
+  font-family: "Amiri";
+  size-adjust: 118%;
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url("@fontsource/amiri/files/amiri-arabic-700-normal.woff2")
+    format("woff2");
+}
+:root[data-font="readex"] {
+  font-family: "Readex Pro Variable", "Vazirmatn Variable", Tahoma, sans-serif;
+}
+:root[data-font="lalezar"] {
+  font-family: "Lalezar", "Vazirmatn Variable", Tahoma, sans-serif;
+}
+:root[data-font="markazi"] {
+  font-family: "Markazi Text Variable", "Vazirmatn Variable", Tahoma, serif;
+}
+:root[data-font="baloo"] {
+  font-family:
+    "Baloo Bhaijaan 2 Variable", "Vazirmatn Variable", Tahoma, sans-serif;
+}
+:root[data-font="amiri"] {
+  font-family: "Amiri", "Vazirmatn Variable", Tahoma, serif;
+}
+:root[data-font="amiri"] .font-sample,
+:root[data-font="markazi"] .font-sample {
+  line-height: 1.6;
+}

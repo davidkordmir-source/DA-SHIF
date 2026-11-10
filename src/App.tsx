@@ -62,7 +62,6 @@ import {
   solar,
   solarInput,
   solarLabel,
-  todayKey,
   weekdays,
   parseSolarInput,
   latin,
@@ -83,7 +82,9 @@ import { loadData, saveData, validateBackup } from "./lib/storage";
 
 import logo from "../assets/hamshift.svg";
 import { AppearancePanel } from "./AppearancePanel";
-import { defaultAppearance } from "./lib/appearance";
+import { defaultAppearance, themes } from "./lib/appearance";
+import { hasIranCalendar, CALENDAR_ANNUAL_YEAR } from "./lib/iran-calendar";
+import { useToday } from "./lib/use-today";
 
 type Page =
   | "schedule"
@@ -125,8 +126,11 @@ export default function App() {
   useLayoutEffect(() => {
     document.documentElement.dataset.theme = appearance.theme;
     document.documentElement.dataset.font = appearance.font;
-    document.documentElement.style.colorScheme =
-      appearance.theme === "midnight" ? "dark" : "light";
+    document.documentElement.style.colorScheme = themes.find(
+      (t) => t.id === appearance.theme,
+    )?.dark
+      ? "dark"
+      : "light";
   }, [appearance.theme, appearance.font]);
   useEffect(() => {
     document.fonts.ready.then(() => window.desktop?.ready());
@@ -139,7 +143,7 @@ export default function App() {
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const [mobileMenu, setMobileMenu] = useState(false);
-  const today = todayKey(),
+  const today = useToday(),
     nowSolar = solar(today);
   const [year, setYear] = useState(nowSolar.jy),
     [month, setMonth] = useState(nowSolar.jm);
@@ -193,6 +197,7 @@ export default function App() {
     null,
   );
   const dates = useMemo(() => monthDates(year, month), [year, month]);
+  const publishedCalendar = dates.every(hasIranCalendar);
   const generateResult = data.schedulingWarnings?.[dates[0]] || [];
   const monthShifts = useMemo(
     () => data.shifts.filter((s) => dates.includes(s.date)),
@@ -614,7 +619,7 @@ export default function App() {
               <b>مدیر سیستم</b>
               <small>فضای کاری شخصی</small>
             </div>
-            <span className="version">۲.۰</span>
+            <span className="version">۲.۱</span>
           </div>
         </div>
       </aside>
@@ -1148,8 +1153,9 @@ export default function App() {
                       افزودن مناسبت
                     </button>
                     <p className="lunar-note">
-                      مناسبت‌های قمری محاسباتی‌اند؛ تاریخ رسمی را می‌توانید در
-                      تنظیمات اصلاح کنید.
+                      {publishedCalendar
+                        ? `تقویم ایران؛ داده‌های قمری تا پایان ${fa(CALENDAR_ANNUAL_YEAR)} همراه برنامه است.`
+                        : "این بازه جدول قمریِ تأییدشده ندارد؛ تاریخ‌ها برآوردی‌اند."}
                     </p>
                   </div>
                   <div className="backup-card">
@@ -1717,8 +1723,8 @@ export default function App() {
                       />
                     </Field>
                     <Field
-                      label="اصلاح روز تقویم قمری"
-                      hint="برای تطبیق محاسبات قمری با اعلام رسمی کشور."
+                      label="اصلاح قمری برای سال‌های فاقد جدول"
+                      hint="فقط خارج از بازهٔ جدول ایران اثر دارد؛ تاریخ‌های جدول با این گزینه جابه‌جا نمی‌شوند."
                     >
                       <Select
                         value={settings.hijriOffset}
@@ -1740,10 +1746,11 @@ export default function App() {
                     </Field>
                   </div>
                   <Notice>
-                    شیفت‌ها روزانه‌اند. جمعه‌ها و تعطیلات ثابت ایران لحاظ
-                    می‌شوند. مناسبت‌های قمری محاسباتی هستند و ممکن است با اعلام
-                    رسمی یک روز تفاوت داشته باشند؛ تعطیلی‌های موردی را نیز
-                    می‌توانید اضافه کنید.
+                    تقویم ایران تا پایان ۱۴۰۵ با جدول شروع ماه‌های قمری و
+                    مناسبت‌های به‌روز همراه برنامه است. برای نمونه، شهادت حضرت
+                    فاطمه در جمعه ۲۲ آبان ۱۴۰۵ قرار دارد. خارج از بازهٔ جدول،
+                    تاریخ قمری برآوردی است. تعطیلی‌های موردی و اصلاحات سفارشی
+                    شما همچنان اولویت دارند.
                   </Notice>
                   <button className="button button-primary" type="submit">
                     <Check size={17} />
@@ -2544,12 +2551,12 @@ export default function App() {
                     setEventForm({ ...eventForm, override: e.target.checked })
                   }
                 />
-                این وضعیت، جایگزین تعطیلی محاسباتی این روز شود
+                این وضعیت، جایگزین تعطیلی ثبت‌شدهٔ این روز شود
               </label>
               <p className="field-explanation">
-                برای اصلاح تاریخ تعطیلات قمری طبق اعلام رسمی، این گزینه را فعال
-                کنید. با برداشتن تیک تعطیلی می‌توانید روز محاسباتی را عادی کنید
-                و تعطیلی درست را جداگانه ثبت کنید.
+                برای تعطیلی‌های موردی یا تغییر طبق اعلام رسمی، این گزینه را فعال
+                کنید. با برداشتن تیک تعطیلی می‌توانید روز را برای برنامهٔ سازمان
+                عادی کنید. این اصلاح شخصی بر تقویم همراه برنامه اولویت دارد.
               </p>
               {error && <ErrorText text={error} />}
             </div>
@@ -2664,8 +2671,9 @@ export default function App() {
               </Notice>
             )}
             <Notice>
-              تاریخ قمری محاسباتی است. برای تعطیلات قمری، اعلام رسمی را بررسی
-              کنید.
+              جدول قمری ایران تا پایان ۱۴۰۵ همراه برنامه است. تاریخ‌های خارج از
+              بازهٔ جدول با نشان برآوردی نمایش داده می‌شوند. تعطیلی‌های موردی
+              طبق اعلام رسمی قابل ثبت‌اند.
             </Notice>
           </div>
           <div className="modal-footer">
@@ -2865,7 +2873,9 @@ function DayDrawer({
             <b dir="ltr">{gregorianLabel(date)}</b>
           </span>
           <span>
-            <small>قمری</small>
+            <small>
+              {hasIranCalendar(date) ? "قمری ایران" : "قمری برآوردی"}
+            </small>
             <b>{lunarLabel(date, data.settings.hijriOffset)}</b>
           </span>
         </div>
@@ -2876,7 +2886,11 @@ function DayDrawer({
           <div className="day-event" key={i}>
             <CalendarDays size={16} />
             <span>{e.title}</span>
-            {e.source === "lunar" && <small>قمری محاسباتی</small>}
+            {e.source === "lunar" && (
+              <small>
+                {hasIranCalendar(date) ? "قمری ایران" : "قمری برآوردی"}
+              </small>
+            )}
           </div>
         ))}
         {shift ? (

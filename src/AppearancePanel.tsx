@@ -10,6 +10,7 @@ import {
 } from "lucide-react";
 import { themes, fonts, type Appearance } from "./lib/appearance";
 import logo from "../assets/hamshift.svg";
+import { fa } from "./lib/calendar";
 
 export function AppearancePanel({
   value,
@@ -26,6 +27,24 @@ export function AppearancePanel({
     logo: string;
   } | null>(null);
   const [busy, setBusy] = useState(false);
+  const [themeFilter, setThemeFilter] = useState("all");
+  const [sample, setSample] = useState("یک تیم، یک ریتم");
+  const visibleThemes = themes.filter(
+    (t) =>
+      themeFilter === "all" ||
+      (themeFilter === "dark"
+        ? t.dark
+        : themeFilter === "light"
+          ? !t.dark
+          : ![
+              "emerald",
+              "violet",
+              "ocean",
+              "sunset",
+              "rose",
+              "midnight",
+            ].includes(t.id)),
+  );
   const refresh = () =>
     window.desktop
       ?.branding()
@@ -67,10 +86,27 @@ export function AppearancePanel({
       <div className="appearance-content">
         <h3 className="appearance-label">
           <Palette size={17} />
-          تم برنامه<span>۶ حال‌وهوای متفاوت</span>
+          تم برنامه<span>{fa(themes.length)} طرح با رنگ و فرم متفاوت</span>
         </h3>
+        <div className="appearance-filters" aria-label="گروه تم‌ها">
+          {[
+            ["all", "همهٔ طرح‌ها"],
+            ["light", "روشن"],
+            ["dark", "تیره"],
+            ["special", "طرح‌های تازه"],
+          ].map(([id, label]) => (
+            <button
+              key={id}
+              className={themeFilter === id ? "filter-active" : ""}
+              onClick={() => setThemeFilter(id)}
+              aria-pressed={themeFilter === id}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
         <div className="theme-grid">
-          {themes.map((theme) => (
+          {visibleThemes.map((theme) => (
             <button
               key={theme.id}
               className={`theme-option ${value.theme === theme.id ? "theme-selected" : ""}`}
@@ -80,6 +116,7 @@ export function AppearancePanel({
             >
               <span
                 className="theme-preview"
+                data-preview={theme.id}
                 style={{ background: theme.surface, color: theme.primary }}
               >
                 <span
@@ -121,8 +158,17 @@ export function AppearancePanel({
         </div>
         <h3 className="appearance-label font-label">
           <Type size={18} />
-          فونت فارسی<span>همراه برنامه، حتی بدون اینترنت</span>
+          فونت فارسی<span>{fa(fonts.length)} سبک؛ همراه برنامه و آفلاین</span>
         </h3>
+        <label className="font-test-input">
+          <span>متن دلخواه برای مقایسهٔ فونت‌ها</span>
+          <input
+            value={sample}
+            maxLength={70}
+            onChange={(e) => setSample(e.target.value)}
+            placeholder="جملهٔ دلخواهتان را بنویسید…"
+          />
+        </label>
         <div className="font-grid">
           {fonts.map((font) => (
             <button
@@ -133,7 +179,7 @@ export function AppearancePanel({
               aria-pressed={value.font === font.id}
               aria-label={`فونت ${font.name}`}
             >
-              <span className="font-sample">یک تیم، یک ریتم</span>
+              <span className="font-sample">{sample || "یک تیم، یک ریتم"}</span>
               <span>
                 <strong>{font.name}</strong>
                 <small>{font.note}</small>

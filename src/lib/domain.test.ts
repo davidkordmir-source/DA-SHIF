@@ -64,10 +64,11 @@ describe("offline calendars", () => {
       ),
     ).toBe(true);
   });
-  it("allows a local lunar adjustment without a remote calendar API", () => {
-    const a = lunar("2026-11-08", 1),
-      b = lunar("2026-11-09", 0);
+  it("uses manual adjustment only outside the published Iran table", () => {
+    const a = lunar("2032-11-08", 1),
+      b = lunar("2032-11-09", 0);
     expect(a).toEqual(b);
+    expect(lunar("2026-11-13", 2)).toEqual({ year: 1448, month: 6, day: 3 });
   });
   it("lets an official local correction replace a calculated holiday", () => {
     const friday = "2026-11-06";
@@ -150,7 +151,9 @@ describe("fair daily scheduling", () => {
   });
   it("fails insufficient headcounts and reports impossible rest constraints", () => {
     expect(() => generateSchedule(fixture(3), 1405, 8)).toThrow("کافی");
-    const result = generateSchedule(fixture(4), 1405, 8);
+    const tooFewForRest = fixture(4);
+    tooFewForRest.settings.minRestDays = 2;
+    const result = generateSchedule(tooFewForRest, 1405, 8);
     expect(result.warnings.length).toBeGreaterThan(0);
     expect(
       result.shifts.every(
