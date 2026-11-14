@@ -12,15 +12,13 @@ function fixture(): AppData {
   return {
     version: 1,
     demo: false,
-    people: "ABCDEFGH"
-      .split("")
-      .map((id) => ({
-        id,
-        name: `همکار ${id}`,
-        department: "عملیات",
-        active: true,
-        reserveOnly: false,
-      })),
+    people: "ABCDEFGH".split("").map((id) => ({
+      id,
+      name: `همکار ${id}`,
+      department: "عملیات",
+      active: true,
+      reserveOnly: false,
+    })),
     shifts: [
       {
         date: "2026-11-01",
@@ -59,7 +57,7 @@ describe("manual reserve assignments", () => {
     expect(validateBackup(JSON.parse(JSON.stringify(next)))).toEqual(next);
     expect(() => generateSchedule(next, 1405, 8)).toThrow("ویرایش رزرو");
   });
-  it("rejects duplicate, main-duty, unknown and newly inactive personnel and capacity changes", () => {
+  it("rejects duplicate, main-duty, unknown and newly inactive personnel but permits capacity changes", () => {
     const data = fixture();
     data.people[4].active = false;
     for (const ids of [
@@ -67,10 +65,12 @@ describe("manual reserve assignments", () => {
       ["A", "D"],
       ["unknown", "D"],
       ["E", "D"],
-      ["C"],
     ])
       expect(() => updateReserves(data, "2026-11-01", ids)).toThrow();
     expect(data.reserveChanges).toBeUndefined();
+    expect(updateReserves(data, "2026-11-01", ["C"]).shifts[0].reserve).toEqual(
+      ["C"],
+    );
     expect(updateReserves(data, "2026-11-01", ["D", "C"])).toBe(data);
     expect(() => updateReserves(data, "2030-01-01", ["F", "G"])).toThrow(
       "برنامه",

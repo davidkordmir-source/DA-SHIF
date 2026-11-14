@@ -6,16 +6,31 @@ const {
   shell,
   nativeImage,
   session,
+  Notification,
+  Tray,
+  Menu,
 } = require("electron");
 const fs = require("node:fs");
 const path = require("node:path");
 const { createDataStore } = require("./data-store.cjs");
 const { loadBranding, imageMime, MAX_LOGO_BYTES } = require("./branding.cjs");
+const {
+  createReminderService,
+  ensureNotificationShortcut,
+} = require("./reminders.cjs");
 const APP_ROOT = path.join(__dirname, "..");
 const ICON = path.join(APP_ROOT, "assets", "hamshift.png");
 const PRELOAD = path.join(__dirname, "preload.cjs");
 let mainWindow, splashWindow, showTimer;
 let storage, installDirectory;
+let latestData = null,
+  reminders,
+  tray,
+  quitting = false;
+app.on("before-quit", () => {
+  quitting = true;
+  reminders?.stop();
+});
 const testing = process.env.HAMSHIFT_TEST === "1" && !app.isPackaged;
 if (testing && process.env.HAMSHIFT_TEST_DATA)
   app.setPath("userData", process.env.HAMSHIFT_TEST_DATA);
@@ -53,9 +68,26 @@ function setupIpc() {
     event.returnValue = validSender(event) ? storage.read() : { ok: false };
   });
   ipcMain.on("data:write", (event, json) => {
-    event.returnValue = validSender(event)
-      ? storage.write(json)
-      : { ok: false };
+    if (!validSender(event)) {
+      event.returnValue = { ok: false };
+      return;
+    }
+    const result = storage.write(json);
+    if (result.ok) {
+      latestData = JSON.parse(json);
+      configureReminder();
+    }
+    event.returnValue = result;
+  });
+  ipcMain.handle("reminder:test", (event) => {
+    if (!validSender(event)) throw new Error("Invalid sender");
+    if (process.platform !== "win32" || !Notification.isSupported())
+      return {
+        ok: false,
+        error:
+          "اعلان سیستمی در نسخهٔ نصب‌شدهٔ ویندوز و با مجوز اعلان‌ها قابل استفاده است.",
+      };
+    return { ok: reminders.test() };
   });
   ipcMain.on("app:ready", (event) => {
     if (validSender(event)) reveal();
@@ -155,6 +187,49 @@ async function start() {
       ? process.env.HAMSHIFT_TEST_INSTALL
       : APP_ROOT;
   storage = createDataStore(app.getPath("userData"));
+  if (process.platform === "win32" && app.isPackaged) {
+    try {
+      if (
+        !ensureNotificationShortcut({
+          appData: app.getPath("appData"),
+          executable: app.getPath("exe"),
+          writeShortcutLink: (...args) => shell.writeShortcutLink(...args),
+        })
+      )
+        console.error("Could not register the Windows notification shortcut.");
+    } catch (error) {
+      console.error(
+        "Notification shortcut registration failed:",
+        error.message,
+      );
+    }
+  }
+  const initial = storage.read();
+  try {
+    latestData = initial.ok && initial.data ? JSON.parse(initial.data) : null;
+  } catch {
+    /* UI handles damaged data. */
+  }
+  reminders = createReminderService({
+    directory: app.getPath("userData"),
+    getData: () => latestData,
+    show: ({ title, body }) => {
+      if (process.platform !== "win32" || !Notification.isSupported())
+        return false;
+      const notification = new Notification({
+        title,
+        body,
+        icon: ICON,
+        timeoutType: "never",
+      });
+      notification.on("click", () => {
+        mainWindow?.show();
+        mainWindow?.focus();
+      });
+      notification.show();
+      return true;
+    },
+  });
   // This application has no network features. Enforce offline behavior in the
   // desktop shell, including external requests hidden in custom content.
   session.defaultSession.webRequest.onBeforeRequest((details, callback) =>
@@ -203,6 +278,19 @@ async function start() {
     },
   });
   mainWindow.removeMenu();
+  mainWindow.on("close", (event) => {
+    if (
+      !quitting &&
+      process.platform === "win32" &&
+      latestData?.reminder?.enabled &&
+      tray
+    ) {
+      event.preventDefault();
+      mainWindow.hide();
+    }
+  });
+  configureReminder();
+  reminders.start();
   harden(mainWindow);
   harden(splashWindow);
   splashWindow.once("ready-to-show", () => splashWindow?.show());
@@ -232,5 +320,41 @@ async function start() {
   });
   await mainWindow.loadFile(path.join(APP_ROOT, "dist", "index.html"));
   showTimer = setTimeout(reveal, 15000);
+}
+function configureReminder() {
+  if (process.platform !== "win32" || testing) return;
+  const settings = latestData?.reminder;
+  try {
+    if (app.isPackaged)
+      app.setLoginItemSettings({
+        name: "Hamshift",
+        openAtLogin: !!settings?.enabled && !!settings?.runAtLogin,
+      });
+    if (settings?.enabled && !tray) {
+      tray = new Tray(ICON);
+      tray.setToolTip("هم‌شیفت · یادآور شیفت");
+      tray.setContextMenu(
+        Menu.buildFromTemplate([
+          {
+            label: "نمایش هم‌شیفت",
+            click: () => {
+              mainWindow?.show();
+              mainWindow?.focus();
+            },
+          },
+          { label: "خروج", click: () => app.quit() },
+        ]),
+      );
+      tray.on("double-click", () => {
+        mainWindow?.show();
+        mainWindow?.focus();
+      });
+    } else if (!settings?.enabled && tray) {
+      tray.destroy();
+      tray = null;
+    }
+  } catch (error) {
+    console.error("Reminder configuration failed:", error.message);
+  }
 }
 app.on("window-all-closed", () => app.quit());

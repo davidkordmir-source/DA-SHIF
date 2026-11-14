@@ -77,6 +77,7 @@ test("Excel import, generation, export, attendance, swaps, and backup work", asy
     .click();
   await page.getByRole("button", { name: "ایجاد برنامهٔ عادلانه" }).click();
   await page.getByRole("button", { name: /ساخت برنامهٔ/ }).click();
+  await expect(page.getByRole("dialog")).toHaveCount(0);
   const generated = await getData(page);
   expect(generated.shifts.length).toBeGreaterThan(27);
   expect(
@@ -92,8 +93,8 @@ test("Excel import, generation, export, attendance, swaps, and backup work", asy
     .getByRole("button", { name: "ثبت جابه‌جایی", exact: true })
     .first()
     .click();
-  await page.getByLabel("تاریخ شیفت اول").selectOption(date.date);
-  await page.getByLabel("تاریخ شیفت دوم").selectOption(date.date);
+  await page.getByLabel("تاریخ شیفت اول").selectOption(date.id || date.date);
+  await page.getByLabel("تاریخ شیفت دوم").selectOption(date.id || date.date);
   await page
     .getByLabel("نیروی اصلی", { exact: true })
     .selectOption(date.primary[0]);

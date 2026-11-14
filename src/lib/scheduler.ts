@@ -1,5 +1,12 @@
 import type { AppData, Person, Shift, Swap, AttendanceStatus } from "../types";
 import { dayDistance, dayOfWeek, eventsFor, monthDates } from "./calendar";
+import {
+  findShift,
+  moveReserveToEnd,
+  restConflict,
+  shiftKey,
+  sharesExecution,
+} from "./shift-utils";
 
 export const workingIds = (s: Shift) => [
   ...s.primary.filter(
@@ -58,7 +65,13 @@ export function generateSchedule(data: AppData, year: number, month: number) {
     data.swaps.some(
       (s) => dateSet.has(s.firstDate) || dateSet.has(s.secondDate),
     ) ||
-    data.reserveChanges?.some((change) => dateSet.has(change.date))
+    data.reserveChanges?.some((change) => dateSet.has(change.date)) ||
+    data.shiftChanges?.some((change) => dateSet.has(change.date)) ||
+    data.plans?.some((plan) =>
+      plan.shiftIds.some((id) =>
+        data.shifts.some((s) => shiftKey(s) === id && dateSet.has(s.date)),
+      ),
+    )
   )
     throw new Error(
       "ماه دارای سوابق حضور، غیبت، جابه‌جایی یا ویرایش رزرو قابل بازتولید نیست.",
@@ -226,8 +239,17 @@ export function validateSwap(
 ) {
   if (!firstId || !secondId || firstId === secondId)
     throw new Error("دو نفر متفاوت انتخاب کنید.");
-  const first = data.shifts.find((s) => s.date === firstDate),
-    second = data.shifts.find((s) => s.date === secondDate);
+  const first = findShift(data, firstDate),
+    second = findShift(data, secondDate);
+  if (
+    first &&
+    second &&
+    first.listId !== second.listId &&
+    !sharesExecution(data, first, second)
+  )
+    throw new Error(
+      "فهرست‌های پیشنهادی مستقل‌اند؛ نفرات هر فهرست را با ویرایش همان شیفت تغییر دهید.",
+    );
   if (
     !first?.primary.includes(firstId) ||
     !second ||
@@ -279,11 +301,15 @@ export function validateSwap(
     if (
       data.shifts.some(
         (s) =>
-          s.date !== source &&
-          s.date !== destination &&
+          shiftKey(s) !== source &&
+          shiftKey(s) !== destination &&
+          sharesExecution(data, findShift(data, destination)!, s) &&
           workingIds(s).includes(id) &&
-          Math.abs(dayDistance(s.date, destination)) <=
+          restConflict(
+            s,
+            findShift(data, destination)!,
             data.settings.minRestDays,
+          ),
       )
     )
       throw new Error(
@@ -295,18 +321,19 @@ export function applySwap(
   data: AppData,
   input: Omit<Swap, "id" | "createdAt">,
 ): AppData {
-  validateSwap(
-    data,
-    input.firstDate,
-    input.firstId,
-    input.secondDate,
-    input.secondId,
-  );
+  const firstKey = input.firstShiftId || input.firstDate;
+  const secondKey = input.secondShiftId || input.secondDate;
+  validateSwap(data, firstKey, input.firstId, secondKey, input.secondId);
+  const first = findShift(data, firstKey)!,
+    second = findShift(data, secondKey)!;
+  const replace = (ids: string[] | undefined, from: string, to: string) =>
+    ids?.map((id) => (id === from ? to : id));
   return {
     ...data,
     shifts: data.shifts.map((s) => {
-      if (s.date !== input.firstDate && s.date !== input.secondDate) return s;
-      if (input.firstDate === input.secondDate)
+      const key = shiftKey(s);
+      if (key !== firstKey && key !== secondKey) return s;
+      if (firstKey === secondKey)
         return {
           ...s,
           primary: s.primary.map((id) =>
@@ -315,21 +342,36 @@ export function applySwap(
           reserve: s.reserve.map((id) =>
             id === input.secondId ? input.firstId : id,
           ),
+          ...(s.leaders
+            ? { leaders: replace(s.leaders, input.firstId, input.secondId) }
+            : {}),
         };
       return {
         ...s,
         primary: s.primary.map((id) =>
-          s.date === input.firstDate && id === input.firstId
+          key === firstKey && id === input.firstId
             ? input.secondId
-            : s.date === input.secondDate && id === input.secondId
+            : key === secondKey && id === input.secondId
               ? input.firstId
               : id,
         ),
+        ...(s.leaders
+          ? {
+              leaders:
+                key === firstKey
+                  ? replace(s.leaders, input.firstId, input.secondId)
+                  : replace(s.leaders, input.secondId, input.firstId),
+            }
+          : {}),
       };
     }),
     swaps: [
       {
         ...input,
+        firstDate: first.date,
+        secondDate: second.date,
+        ...(first.id ? { firstShiftId: firstKey } : {}),
+        ...(second.id ? { secondShiftId: secondKey } : {}),
         id: crypto.randomUUID(),
         createdAt: new Date().toISOString(),
       },
@@ -343,11 +385,15 @@ export function reserveDutyConflicts(
   date: string,
   personId: string,
 ) {
+  const target = findShift(data, date);
   return data.shifts.filter(
     (s) =>
-      s.date !== date &&
+      shiftKey(s) !== date &&
+      (!target || sharesExecution(data, target, s)) &&
       workingIds(s).includes(personId) &&
-      Math.abs(dayDistance(s.date, date)) <= data.settings.minRestDays,
+      (target
+        ? restConflict(s, target, data.settings.minRestDays)
+        : Math.abs(dayDistance(s.date, date)) <= data.settings.minRestDays),
   );
 }
 
@@ -358,12 +404,8 @@ export function updateReserves(
   note = "",
   source: "manual" | "attendance" = "manual",
 ): AppData {
-  const shift = data.shifts.find((s) => s.date === date);
+  const shift = findShift(data, date);
   if (!shift) throw new Error("این روز برنامهٔ شیفت ندارد.");
-  if (nextIds.length !== shift.reserve.length)
-    throw new Error(
-      "تعداد نفرات رزرو این روز باید ثابت بماند. برای هر جایگاه، یک نفر انتخاب کنید.",
-    );
   if (new Set(nextIds).size !== nextIds.length || nextIds.some((id) => !id))
     throw new Error("رزروهای روز باید افراد متفاوت باشند.");
   for (const id of nextIds) {
@@ -372,6 +414,19 @@ export function updateReserves(
       throw new Error("فقط از پرسنل فعال می‌توانید رزرو جدید انتخاب کنید.");
     if (shift.primary.includes(id))
       throw new Error("نیروی اصلی همین روز نمی‌تواند هم‌زمان رزرو باشد.");
+    if (
+      data.shifts.some(
+        (s) =>
+          shiftKey(s) !== date &&
+          s.listId !== shift.listId &&
+          sharesExecution(data, shift, s) &&
+          [...s.primary, ...s.reserve].includes(id) &&
+          restConflict(s, shift, 0),
+      )
+    )
+      throw new Error(
+        "این فرد هم‌زمان در فهرست اجرایی دیگری مسئول، همراه یا رزرو است.",
+      );
   }
   for (const entry of shift.attendance) {
     if (entry.replacementId && !nextIds.includes(entry.replacementId))
@@ -379,17 +434,22 @@ export function updateReserves(
         "رزروی که حضور جایگزین او ثبت شده قابل حذف از این روز نیست؛ سوابق حضور باید حفظ شوند.",
       );
   }
-  if (nextIds.every((id) => shift.reserve.includes(id))) return data;
+  if (
+    nextIds.length === shift.reserve.length &&
+    nextIds.every((id) => shift.reserve.includes(id))
+  )
+    return data;
   return {
     ...data,
     shifts: data.shifts.map((s) =>
-      s.date === date ? { ...s, reserve: [...nextIds] } : s,
+      shiftKey(s) === date ? { ...s, reserve: [...nextIds] } : s,
     ),
     reserveChanges: [
       {
         id: crypto.randomUUID(),
         createdAt: new Date().toISOString(),
-        date,
+        date: shift.date,
+        ...(shift.id ? { shiftId: shift.id } : {}),
         previousIds: [...shift.reserve],
         nextIds: [...nextIds],
         note: note.trim().slice(0, 500),
@@ -409,7 +469,7 @@ export function recordAttendance(
   replacementId?: string,
   releaseReserveId?: string,
 ): AppData {
-  let shift = data.shifts.find((s) => s.date === date);
+  let shift = findShift(data, date);
   if (!shift?.primary.includes(personId))
     throw new Error("فرد انتخاب‌شده در این روز شیفت ندارد.");
   if (replacementId && status === "present")
@@ -428,7 +488,7 @@ export function recordAttendance(
       `انتخاب جایگزین دستی برای ${absentName}${note.trim() ? `؛ ${note.trim()}` : ""}`,
       "attendance",
     );
-    shift = data.shifts.find((s) => s.date === date)!;
+    shift = findShift(data, date)!;
   }
   if (
     replacementId &&
@@ -439,15 +499,51 @@ export function recordAttendance(
     throw new Error("این نیروی رزرو قبلاً جایگزین شده است.");
   if (
     replacementId &&
-    reserveDutyConflicts(data, date, replacementId).length > 0
+    data.shifts.some(
+      (s) =>
+        shiftKey(s) !== date &&
+        sharesExecution(data, shift!, s) &&
+        workingIds(s).includes(replacementId) &&
+        restConflict(s, shift!, data.settings.minRestDays),
+    )
   )
     throw new Error(
       "نیروی رزرو انتخاب‌شده با حداقل فاصلهٔ استراحت تداخل دارد. رزرو دیگری انتخاب کنید.",
     );
+  const previousReplacement = shift.attendance.find(
+    (a) => a.personId === personId,
+  )?.replacementId;
+  if (replacementId && replacementId !== previousReplacement)
+    data = moveReserveToEnd(data, replacementId, shift.listId);
+  const previousAttendance = shift.attendance.find(
+    (a) => a.personId === personId,
+  );
+  const person = data.people.find((p) => p.id === personId);
+  const assignedFromReserve =
+    person?.role === "reserve" ||
+    person?.reserveOnly ||
+    data.shiftChanges?.some(
+      (change) =>
+        change.shiftId === date &&
+        change.previous.reserve.includes(personId) &&
+        change.next.primary.includes(personId),
+    ) ||
+    data.swaps.some(
+      (swap) =>
+        (swap.firstShiftId || swap.firstDate) === date &&
+        (swap.secondShiftId || swap.secondDate) === date &&
+        swap.secondId === personId,
+    );
+  if (
+    status === "present" &&
+    previousAttendance?.status !== "present" &&
+    assignedFromReserve
+  )
+    data = moveReserveToEnd(data, personId, shift.listId);
   return {
     ...data,
     shifts: data.shifts.map((s) =>
-      s.date === date
+      shiftKey(s) === date
         ? {
             ...s,
             attendance: [

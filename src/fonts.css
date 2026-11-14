@@ -105,3 +105,52 @@
 :root[data-font="markazi"] .font-sample {
   line-height: 1.6;
 }
+
+@font-face {
+  font-family: "Noto Naskh Arabic Variable";
+  font-style: normal;
+  font-weight: 400 700;
+  font-display: swap;
+  size-adjust: 112%;
+  src: url("@fontsource-variable/noto-naskh-arabic/files/noto-naskh-arabic-arabic-wght-normal.woff2")
+    format("woff2");
+}
+:root[data-font="naskh"] {
+  font-family:
+    "Noto Naskh Arabic Variable", "Vazirmatn Variable", Tahoma, serif;
+}
+:root[data-font="plex"] {
+  font-family: "IBM Plex Sans Arabic", "Vazirmatn Variable", Tahoma, sans-serif;
+}
+@font-face {
+  font-family: "IBM Plex Sans Arabic";
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("@fontsource/ibm-plex-sans-arabic/files/ibm-plex-sans-arabic-arabic-400-normal.woff2")
+    format("woff2");
+}
+@font-face {
+  font-family: "IBM Plex Sans Arabic";
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url("@fontsource/ibm-plex-sans-arabic/files/ibm-plex-sans-arabic-arabic-500-normal.woff2")
+    format("woff2");
+}
+@font-face {
+  font-family: "IBM Plex Sans Arabic";
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url("@fontsource/ibm-plex-sans-arabic/files/ibm-plex-sans-arabic-arabic-600-normal.woff2")
+    format("woff2");
+}
+@font-face {
+  font-family: "IBM Plex Sans Arabic";
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url("@fontsource/ibm-plex-sans-arabic/files/ibm-plex-sans-arabic-arabic-700-normal.woff2")
+    format("woff2");
+}

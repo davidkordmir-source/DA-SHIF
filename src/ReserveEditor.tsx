@@ -4,6 +4,7 @@ import type { AppData, ReserveChange } from "./types";
 import { Badge, Empty, Field, Modal, Notice, Select } from "./components";
 import { fa, latin, solarLabel } from "./lib/calendar";
 import { reserveDutyConflicts, updateReserves } from "./lib/scheduler";
+import { findShift, shiftKey, namedShiftLabel } from "./lib/shift-utils";
 
 export function ReserveEditor({
   data,
@@ -16,14 +17,13 @@ export function ReserveEditor({
   onSave: (next: AppData) => boolean;
   onClose: () => void;
 }) {
-  const first =
-    data.shifts.find((s) => s.date === initialDate) || data.shifts[0];
-  const [date, setDate] = useState(first?.date || "");
+  const first = findShift(data, initialDate) || data.shifts[0];
+  const [date, setDate] = useState(first ? shiftKey(first) : "");
   const [ids, setIds] = useState<string[]>(first ? [...first.reserve] : []);
   const [query, setQuery] = useState("");
   const [note, setNote] = useState("");
   const [error, setError] = useState("");
-  const shift = data.shifts.find((s) => s.date === date);
+  const shift = findShift(data, date);
   const locked = new Set(
     shift?.attendance.flatMap((a) =>
       a.replacementId ? [a.replacementId] : [],
@@ -43,7 +43,10 @@ export function ReserveEditor({
   const conflicts = ids.filter(
     (id) => reserveDutyConflicts(data, date, id).length > 0,
   );
-  const changed = !!shift && ids.some((id) => !shift.reserve.includes(id));
+  const changed =
+    !!shift &&
+    (ids.length !== shift.reserve.length ||
+      ids.some((id) => !shift.reserve.includes(id)));
   const name = (id: string) => data.people.find((p) => p.id === id)?.name || id;
   return (
     <Modal
@@ -71,7 +74,7 @@ export function ReserveEditor({
               required
               value={date}
               onChange={(e) => {
-                const s = data.shifts.find((s) => s.date === e.target.value);
+                const s = findShift(data, e.target.value);
                 setDate(e.target.value);
                 setIds(s ? [...s.reserve] : []);
                 setNote("");
@@ -80,19 +83,36 @@ export function ReserveEditor({
             >
               <option value="">انتخاب تاریخ</option>
               {data.shifts.map((s) => (
-                <option key={s.date} value={s.date}>
-                  {solarLabel(s.date)}
+                <option key={shiftKey(s)} value={shiftKey(s)}>
+                  {namedShiftLabel(data, s)}
                 </option>
               ))}
             </Select>
           </Field>
+          {shift && (
+            <Field label="تعداد رزرو این نوبت">
+              <input
+                type="number"
+                min={0}
+                max={data.people.filter((p) => p.active).length}
+                value={ids.length}
+                onChange={(e) => {
+                  const count = Number(e.target.value);
+                  if (!Number.isInteger(count) || count < 0 || count > 2000)
+                    return;
+                  setIds(Array.from({ length: count }, (_, i) => ids[i] || ""));
+                  setError("");
+                }}
+              />
+            </Field>
+          )}
           {shift && ids.length ? (
             <>
               <Notice>
                 تعداد رزرو این روز {fa(ids.length)} نفر است. می‌توانید هر جایگاه
-                را به فرد دیگری بدهید؛ نیروی اصلی همان روز و فرد تکراری قابل
-                انتخاب نیستند. تغییرات با نام افراد، تاریخ و توضیح در تاریخچه
-                ثبت می‌شوند.
+                را به فرد دیگری بدهید یا ظرفیت را تغییر دهید؛ نیروی اصلی همان
+                نوبت و فرد تکراری قابل انتخاب نیستند. تغییرات با نام افراد،
+                تاریخ و توضیح در تاریخچه ثبت می‌شوند.
               </Notice>
               <label className="search-input reserve-search">
                 <Search size={17} />
@@ -131,6 +151,7 @@ export function ReserveEditor({
                           setError("");
                         }}
                       >
+                        <option value="">انتخاب فرد</option>
                         {candidates.map((p) => {
                           const main = shift.primary.includes(p.id),
                             other = ids.some(
@@ -157,7 +178,10 @@ export function ReserveEditor({
                       </Select>
                     </Field>
                     <small className="reserve-previous">
-                      رزرو قبلی: {name(shift.reserve[index])}
+                      رزرو قبلی:{" "}
+                      {shift.reserve[index]
+                        ? name(shift.reserve[index])
+                        : "جایگاه جدید"}
                     </small>
                   </div>
                 ))}
@@ -183,7 +207,7 @@ export function ReserveEditor({
           ) : (
             <Empty
               title="این روز رزرو ندارد"
-              text="برای روزی که در برنامه نیروی رزرو دارد، می‌توانید نفرات را تغییر دهید."
+              text="برای افزودن رزرو، تعداد رزرو این نوبت را افزایش دهید."
             />
           )}
           {error && (

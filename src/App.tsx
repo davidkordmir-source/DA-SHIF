@@ -37,7 +37,13 @@ import {
   FileUp,
   CircleCheck,
 } from "lucide-react";
-import type { AppData, AttendanceStatus, Person, Settings } from "./types";
+import type {
+  AppData,
+  AttendanceStatus,
+  Person,
+  PersonRole,
+  Settings,
+} from "./types";
 import {
   Avatar,
   Badge,
@@ -66,12 +72,7 @@ import {
   parseSolarInput,
   latin,
 } from "./lib/calendar";
-import {
-  applySwap,
-  generateSchedule,
-  personStats,
-  recordAttendance,
-} from "./lib/scheduler";
+import { applySwap, personStats, recordAttendance } from "./lib/scheduler";
 import {
   download,
   downloadTemplate,
@@ -86,9 +87,22 @@ import { ReserveEditor, ReserveHistory } from "./ReserveEditor";
 import { defaultAppearance, themes } from "./lib/appearance";
 import { hasIranCalendar, CALENDAR_ANNUAL_YEAR } from "./lib/iran-calendar";
 import { useToday } from "./lib/use-today";
+import { PlanningDialog, ShiftEditor } from "./PlanningDialog";
+import { HistoryPanel, ReminderPanel, ReserveQueuePanel } from "./HistoryPanel";
+import {
+  findShift,
+  personRoleLabel,
+  listName,
+  namedShiftLabel,
+  primaryRole,
+  roleLabels,
+  shiftKey,
+  shiftTimeLabel,
+} from "./lib/shift-utils";
 
 type Page =
   | "schedule"
+  | "history"
   | "people"
   | "attendance"
   | "swaps"
@@ -99,6 +113,7 @@ type Dialog =
   | null
   | "import"
   | "generate"
+  | "editShift"
   | "swap"
   | "attendance"
   | "reserve"
@@ -109,6 +124,7 @@ type Dialog =
   | "alerts";
 const nav: { id: Page; title: string; icon: typeof CalendarDays }[] = [
   { id: "schedule", title: "برنامهٔ شیفت‌ها", icon: CalendarDays },
+  { id: "history", title: "تاریخچهٔ برنامه‌ها", icon: CalendarRange },
   { id: "people", title: "پرسنل", icon: Users },
   { id: "attendance", title: "حضور و غیاب", icon: ClipboardCheck },
   { id: "swaps", title: "جابه‌جایی شیفت", icon: ArrowLeftRight },
@@ -140,6 +156,29 @@ export default function App() {
 
   const [storageError, setStorageError] = useState(loaded.error || "");
   const [page, setPage] = useState<Page>("schedule");
+  const [activeListId, setActiveListId] = useState("");
+  const visibleShifts = useMemo(
+    () =>
+      data.shifts.filter(
+        (s) =>
+          !activeListId ||
+          (activeListId === "legacy" ? !s.listId : s.listId === activeListId),
+      ),
+    [data.shifts, activeListId],
+  );
+  const visibleKeys = useMemo(
+    () => new Set(visibleShifts.map(shiftKey)),
+    [visibleShifts],
+  );
+  const visibleSwaps = data.swaps.filter(
+    (swap) =>
+      !activeListId ||
+      visibleKeys.has(swap.firstShiftId || swap.firstDate) ||
+      visibleKeys.has(swap.secondShiftId || swap.secondDate),
+  );
+  const visibleReserveChanges = (data.reserveChanges || []).filter(
+    (change) => !activeListId || visibleKeys.has(change.shiftId || change.date),
+  );
   const [dialog, setDialog] = useState<Dialog>(null);
   const [toast, setToast] = useState("");
   const [error, setError] = useState("");
@@ -160,6 +199,12 @@ export default function App() {
   const [imported, setImported] = useState<Person[]>([]),
     [importErrors, setImportErrors] = useState<string[]>([]);
   const [fileName, setFileName] = useState("");
+  const [importRole, setImportRole] = useState<PersonRole | "">("");
+  const [peopleGroup, setPeopleGroup] = useState<PersonRole | "all" | "legacy">(
+    "all",
+  );
+  const [editingPerson, setEditingPerson] = useState<string | null>(null);
+  const [editShiftKey, setEditShiftKey] = useState("");
   const [swapForm, setSwapForm] = useState({
     firstDate: today,
     secondDate: today,
@@ -182,10 +227,19 @@ export default function App() {
   });
   const [reserveEditDate, setReserveEditDate] = useState(today);
   const [releaseReserveId, setReleaseReserveId] = useState("");
-  const [personForm, setPersonForm] = useState({
+  const [personForm, setPersonForm] = useState<{
+    id: string;
+    name: string;
+    department: string;
+    phone: string;
+    role: PersonRole | "";
+    reserveOnly: boolean;
+  }>({
     id: "",
     name: "",
     department: "",
+    phone: "",
+    role: "companion",
     reserveOnly: false,
   });
   const [eventForm, setEventForm] = useState({
@@ -202,10 +256,25 @@ export default function App() {
   );
   const dates = useMemo(() => monthDates(year, month), [year, month]);
   const publishedCalendar = dates.every(hasIranCalendar);
-  const generateResult = data.schedulingWarnings?.[dates[0]] || [];
+  const generateResult = [
+    ...(!activeListId || activeListId === "legacy"
+      ? data.schedulingWarnings?.[dates[0]] || []
+      : []),
+    ...(data.plans || [])
+      .filter(
+        (p) =>
+          p.startDate <= dates.at(-1)! &&
+          p.endDate >= dates[0] &&
+          (!activeListId ||
+            (activeListId === "legacy"
+              ? !p.listId
+              : p.listId === activeListId)),
+      )
+      .flatMap((p) => data.schedulingWarnings?.[p.id] || []),
+  ];
   const monthShifts = useMemo(
-    () => data.shifts.filter((s) => dates.includes(s.date)),
-    [data.shifts, dates],
+    () => visibleShifts.filter((s) => dates.includes(s.date)),
+    [visibleShifts, dates],
   );
   const monthEvents = dates
     .map((date) => ({
@@ -214,7 +283,22 @@ export default function App() {
     }))
     .filter((e) => e.events.length);
   const activePeople = data.people.filter((p) => p.active);
-  const normalPeople = activePeople.filter((p) => !p.reserveOnly);
+  const plannedPeople = new Set(
+    (data.plans || [])
+      .filter(
+        (p) =>
+          p.startDate <= dates.at(-1)! &&
+          p.endDate >= dates[0] &&
+          (!activeListId || p.listId === activeListId),
+      )
+      .flatMap((p) => p.peopleIds),
+  );
+  const normalPeople = activePeople.filter(
+    (p) =>
+      !p.reserveOnly &&
+      p.role !== "reserve" &&
+      (!plannedPeople.size || plannedPeople.has(p.id)),
+  );
   const holidays = dates.filter(
     (d) => eventsFor(d, data.events, data.settings.hijriOffset).holiday,
   );
@@ -222,18 +306,23 @@ export default function App() {
     ...p,
     stats: personStats(p.id, monthShifts, data),
   }));
-  const totals = normalPeople.map(
-    (p) => personStats(p.id, monthShifts, data).total,
+  const primaryGroups = ["leader", "companion", undefined].map((role) =>
+    normalPeople.filter((p) => p.role === role),
   );
-  const holidayTotals = normalPeople.map(
-    (p) => personStats(p.id, monthShifts, data).holiday,
-  );
-  const totalSpread = totals.length
-    ? Math.max(...totals) - Math.min(...totals)
-    : 0;
-  const holidaySpread = holidayTotals.length
-    ? Math.max(...holidayTotals) - Math.min(...holidayTotals)
-    : 0;
+  const spreadFor = (metric: "total" | "holiday") =>
+    Math.max(
+      0,
+      ...primaryGroups
+        .filter((group) => group.length)
+        .map((group) => {
+          const counts = group.map(
+            (p) => monthStats.find((row) => row.id === p.id)!.stats[metric],
+          );
+          return Math.max(...counts) - Math.min(...counts);
+        }),
+    );
+  const totalSpread = spreadFor("total"),
+    holidaySpread = spreadFor("holiday");
   const searchable = (value: string) =>
     latin(value)
       .replace(/ي/g, "ی")
@@ -242,7 +331,9 @@ export default function App() {
       .trim()
       .toLowerCase();
   const searchMatches = (p: Person) =>
-    searchable(`${p.name} ${p.id} ${p.department}`).includes(searchable(query));
+    searchable(`${p.name} ${p.id} ${p.department} ${p.phone || ""}`).includes(
+      searchable(query),
+    );
   const person = (id: string) => data.people.find((p) => p.id === id);
   const name = (id: string) => person(id)?.name || "فرد حذف‌شده";
   const showToast = (message: string) => setToast(message);
@@ -314,9 +405,7 @@ export default function App() {
   };
   const startAttendance = (date: string, id: string) => {
     setReleaseReserveId("");
-    const a = data.shifts
-      .find((s) => s.date === date)
-      ?.attendance.find((a) => a.personId === id);
+    const a = findShift(data, date)?.attendance.find((a) => a.personId === id);
     setAttendanceForm({
       date,
       personId: id,
@@ -327,9 +416,12 @@ export default function App() {
     open("attendance");
   };
   const startSwap = (date = selectedDate) => {
+    const target =
+      findShift(data, date) || visibleShifts.find((s) => s.date === date);
+    const key = target ? shiftKey(target) : date;
     setSwapForm({
-      firstDate: date,
-      secondDate: date,
+      firstDate: key,
+      secondDate: key,
       firstId: "",
       secondId: "",
       note: "",
@@ -337,9 +429,12 @@ export default function App() {
     open("swap");
   };
   const startReserveEdit = (requested = selectedDate) => {
-    const date = data.shifts.some((s) => s.date === requested)
-      ? requested
-      : monthShifts[0]?.date || data.shifts[0]?.date || requested;
+    const target =
+      findShift(data, requested) ||
+      visibleShifts.find((s) => s.date === requested) ||
+      monthShifts[0] ||
+      data.shifts[0];
+    const date = target ? shiftKey(target) : requested;
     setReserveEditDate(date);
     open("reserve");
   };
@@ -354,48 +449,49 @@ export default function App() {
     });
     open("event");
   };
-  const handleGenerate = () => {
-    try {
-      if (
-        monthShifts.some((s) => s.attendance.length) ||
-        data.swaps.some(
-          (s) => dates.includes(s.firstDate) || dates.includes(s.secondDate),
-        ) ||
-        data.reserveChanges?.some((c) => dates.includes(c.date))
-      )
-        throw new Error(
-          "این ماه سابقهٔ حضور، غیبت، جابه‌جایی یا ویرایش رزرو دارد. برای حفظ سوابق، بازتولید مجاز نیست. ماه دیگری انتخاب کنید.",
-        );
-      const result = generateSchedule(data, year, month);
-      if (
-        commit(
-          {
-            ...data,
-            shifts: result.shifts,
-            schedulingWarnings: {
-              ...data.schedulingWarnings,
-              [dates[0]]: result.warnings,
-            },
-          },
-          "برنامهٔ ماه با موفقیت ساخته و ذخیره شد.",
-        )
-      )
-        close();
-    } catch (e) {
-      setError((e as Error).message);
-    }
+  const startPersonEdit = (p?: Person) => {
+    setEditingPerson(p?.id || null);
+    setPersonForm({
+      id: p?.id || "",
+      name: p?.name || "",
+      department: p?.department || "",
+      phone: p?.phone || "",
+      role: p ? p.role || "" : "companion",
+      reserveOnly: p?.reserveOnly || false,
+    });
+    open("person");
   };
-  const handleExcel = async (file?: File) => {
-    if (!file) return;
+  const startShiftEdit = (key: string) => {
+    setEditShiftKey(key);
+    setDetailOpen(false);
+    open("editShift");
+  };
+  const handleExcel = async (input?: File | File[]) => {
+    const files = input ? (Array.isArray(input) ? input : [input]) : [];
+    if (!files.length) return;
     setBusy(true);
     setError("");
     setImported([]);
     setImportErrors([]);
-    setFileName(file.name);
+    setFileName(files.map((file) => file.name).join("، "));
     try {
-      const result = await readPeople(file);
-      setImported(result.people);
-      setImportErrors(result.errors);
+      const people: Person[] = [],
+        errors: string[] = [];
+      for (const file of files) {
+        try {
+          const result = await readPeople(file, importRole || undefined);
+          for (const p of result.people) {
+            if (people.some((q) => q.id === p.id))
+              errors.push(`کد «${p.id}» در فایل‌های انتخاب‌شده تکراری است.`);
+            else people.push(p);
+          }
+          errors.push(...result.errors.map((e) => `${file.name}: ${e}`));
+        } catch (e) {
+          errors.push(`${file.name}: ${(e as Error).message}`);
+        }
+      }
+      setImported(people);
+      setImportErrors(errors);
     } catch (e) {
       setError((e as Error).message);
     } finally {
@@ -404,7 +500,14 @@ export default function App() {
     }
   };
   const applyImport = () => {
-    let people = data.demo ? [] : [...data.people];
+    const replaceDemo =
+      data.demo &&
+      !data.shifts.some((s) => s.attendance.length) &&
+      !data.swaps.length &&
+      !data.reserveChanges?.length &&
+      !data.shiftChanges?.length &&
+      !data.plans?.length;
+    let people = replaceDemo ? [] : [...data.people];
     for (const p of imported) {
       let i = people.findIndex((q) => q.id === p.id);
       if (i < 0 && p.id.startsWith("name:")) {
@@ -417,14 +520,21 @@ export default function App() {
         }
         if (matches.length === 1) i = matches[0].index;
       }
-      if (i >= 0) people[i] = { ...p, id: people[i].id };
+      if (i >= 0)
+        people[i] = {
+          ...people[i],
+          ...p,
+          role: p.role || people[i].role,
+          phone: p.phone || people[i].phone || "",
+          id: people[i].id,
+        };
       else people.push(p);
     }
     const next = {
       ...data,
       people,
       demo: false,
-      ...(data.demo
+      ...(replaceDemo
         ? { shifts: [], swaps: [], reserveChanges: [], schedulingWarnings: {} }
         : {}),
     };
@@ -443,7 +553,7 @@ export default function App() {
   const handleExport = async () => {
     setBusy(true);
     try {
-      await exportSchedule(data, dates);
+      await exportSchedule({ ...data, shifts: visibleShifts }, dates);
       showToast("فایل اکسل برنامه و گزارش‌ها آماده شد.");
     } catch {
       showToast("ساخت خروجی اکسل انجام نشد. دوباره تلاش کنید.");
@@ -475,6 +585,10 @@ export default function App() {
     schedule: [
       "برنامهٔ شیفت‌ها",
       "برنامه‌ریزی منظم، تقسیم عادلانه و یک تیم هماهنگ.",
+    ],
+    history: [
+      "تاریخچهٔ برنامه‌ها",
+      "همهٔ بازه‌ها، سال‌ها و تغییرات ثبت‌شدهٔ تیم شما.",
     ],
     people: ["پرسنل", "همهٔ اعضای تیم و سابقهٔ شیفت‌هایشان، در یک نگاه."],
     attendance: [
@@ -540,16 +654,14 @@ export default function App() {
         ),
     );
   const profilePerson = person(personId);
-  const attendanceShift = data.shifts.find(
-    (s) => s.date === attendanceForm.date,
-  );
+  const attendanceShift = findShift(data, attendanceForm.date);
   const outsideReserve =
     !!attendanceForm.replacementId &&
     !!attendanceShift &&
     !attendanceShift.reserve.includes(attendanceForm.replacementId);
   const priorShifts = useMemo(
-    () => data.shifts.filter((s) => s.date < dates[0]),
-    [data.shifts, dates],
+    () => visibleShifts.filter((s) => s.date < dates[0]),
+    [visibleShifts, dates],
   );
   const priorMonthCount = useMemo(
     () => new Set(priorShifts.map((s) => solarInput(s.date).slice(0, 7))).size,
@@ -656,7 +768,7 @@ export default function App() {
               <b>مدیر سیستم</b>
               <small>فضای کاری شخصی</small>
             </div>
-            <span className="version">۲.۲</span>
+            <span className="version">۲.۳</span>
           </div>
         </div>
       </aside>
@@ -757,13 +869,7 @@ export default function App() {
                   <button
                     className="button button-primary"
                     onClick={() => {
-                      setPersonForm({
-                        id: "",
-                        name: "",
-                        department: "",
-                        reserveOnly: false,
-                      });
-                      open("person");
+                      startPersonEdit();
                     }}
                   >
                     <Plus size={18} />
@@ -844,6 +950,37 @@ export default function App() {
             </div>
           )}
 
+          {["schedule", "attendance", "reserves", "reports", "swaps"].includes(
+            page,
+          ) &&
+            !!data.scheduleLists?.length && (
+              <section className="panel workspace-list-picker">
+                <Field label="فهرست نمایشی">
+                  <Select
+                    value={activeListId}
+                    onChange={(e) => {
+                      setActiveListId(e.target.value);
+                      setDetailOpen(false);
+                    }}
+                  >
+                    <option value="">همهٔ فهرست‌ها و موقعیت‌ها</option>
+                    {data.shifts.some((s) => !s.listId) && (
+                      <option value="legacy">فهرست قبلی</option>
+                    )}
+                    {data.scheduleLists.map((list) => (
+                      <option key={list.id} value={list.id}>
+                        {list.name} ·{" "}
+                        {list.mode === "parallel" ? "اجرایی" : "پیشنهادی"}
+                      </option>
+                    ))}
+                  </Select>
+                </Field>
+                <p>
+                  هر فهرست، برنامه، ویرایش‌ها و صف رزرو خود را دارد. فهرست‌های
+                  پیشنهادی، گزینه‌های جایگزین برای مقایسه هستند.
+                </p>
+              </section>
+            )}
           {page === "schedule" && (
             <>
               <section className="stats-grid" aria-label="آمار ماه">
@@ -862,10 +999,15 @@ export default function App() {
                 <StatCard
                   label="شیفت‌های این ماه"
                   value={monthShifts.reduce((n, s) => n + s.primary.length, 0)}
-                  unit="نفر ـ روز"
+                  unit="نفر ـ نوبت"
                   icon={<CalendarRange size={20} />}
                   tone="blue"
-                  foot={<>{fa(monthShifts.length)} روز برنامه‌ریزی‌شده</>}
+                  foot={
+                    <>
+                      {fa(new Set(monthShifts.map((s) => s.date)).size)} روز ·{" "}
+                      {fa(monthShifts.length)} نوبت برنامه‌ریزی‌شده
+                    </>
+                  }
                 />
                 <StatCard
                   label="روزهای تعطیل"
@@ -888,7 +1030,7 @@ export default function App() {
                     >
                       {monthShifts.length
                         ? holidaySpread <= 1
-                          ? "متعادل بین نیروهای اصلی"
+                          ? "متعادل در هر نقش"
                           : "گزارش عدالت را بررسی کنید"
                         : "پس از ایجاد برنامه محاسبه می‌شود"}
                     </span>
@@ -1011,9 +1153,10 @@ export default function App() {
                             ),
                           )}
                           {dates.map((date) => {
-                            const shift = data.shifts.find(
+                            const dayShifts = visibleShifts.filter(
                                 (s) => s.date === date,
                               ),
+                              shift = dayShifts[0],
                               info = eventsFor(
                                 date,
                                 data.events,
@@ -1053,23 +1196,41 @@ export default function App() {
                                   ) : null}
                                 </div>
                                 <div className="shift-names">
-                                  {shift?.primary.map((id, i) => (
-                                    <span
-                                      className={`shift-chip chip-${i % 2}`}
-                                      key={id}
-                                    >
-                                      <span />
-                                      {name(id)
-                                        .split(" ")
-                                        .slice(0, 2)
-                                        .join(" ")}
-                                    </span>
-                                  ))}
+                                  {dayShifts.flatMap((duty) =>
+                                    duty.primary.map((id, i) => (
+                                      <span
+                                        className={`shift-chip chip-${i % 2}`}
+                                        key={`${shiftKey(duty)}-${id}`}
+                                      >
+                                        <span />
+                                        {duty.leaders?.includes(id)
+                                          ? "مسئول: "
+                                          : duty.leaders
+                                            ? "همراه: "
+                                            : ""}
+                                        {name(id)
+                                          .split(" ")
+                                          .slice(0, 2)
+                                          .join(" ")}
+                                      </span>
+                                    )),
+                                  )}
+                                  {dayShifts.length > 1 && (
+                                    <small>
+                                      {fa(dayShifts.length)} نوبت ساعتی
+                                    </small>
+                                  )}
                                 </div>
                                 {shift && shift.reserve.length > 0 ? (
                                   <span className="reserve-count">
                                     <span className="mini-reserve-dot" />
-                                    {fa(shift.reserve.length)} نفر رزرو
+                                    {fa(
+                                      dayShifts.reduce(
+                                        (n, s) => n + s.reserve.length,
+                                        0,
+                                      ),
+                                    )}{" "}
+                                    نفر رزرو
                                   </span>
                                 ) : !shift ? (
                                   <span className="no-shift">بدون برنامه</span>
@@ -1106,6 +1267,7 @@ export default function App() {
                   ) : (
                     <ShiftTable
                       shifts={filteredShifts}
+                      listLabel={(s) => listName(data, s)}
                       name={name}
                       events={(date) =>
                         eventsFor(date, data.events, data.settings.hijriOffset)
@@ -1246,6 +1408,22 @@ export default function App() {
             </>
           )}
 
+          {page === "history" && (
+            <HistoryPanel
+              data={data}
+              onDay={(date, listId) => {
+                setActiveListId(listId || "legacy");
+                setSelectedDate(date);
+                setDetailOpen(true);
+              }}
+              onEdit={startShiftEdit}
+              onSave={(next) => commit(next, "نام فهرست ذخیره شد.")}
+              notify={showToast}
+            />
+          )}
+          {page === "reserves" && (
+            <ReserveQueuePanel data={data} listId={activeListId} />
+          )}
           {page === "people" && (
             <section className="panel">
               <div className="section-toolbar">
@@ -1262,6 +1440,45 @@ export default function App() {
                   placeholder="جست‌وجوی نام، کد یا واحد..."
                 />
               </div>
+              <div className="role-tabs" role="tablist" aria-label="گروه پرسنل">
+                {(
+                  [
+                    "all",
+                    "leader",
+                    "companion",
+                    "reserve",
+                    ...(data.people.some((p) => !p.role && !p.reserveOnly)
+                      ? ["legacy"]
+                      : []),
+                  ] as const
+                ).map((group) => (
+                  <button
+                    type="button"
+                    role="tab"
+                    aria-selected={peopleGroup === group}
+                    className={peopleGroup === group ? "selected" : ""}
+                    key={group}
+                    onClick={() => setPeopleGroup(group as typeof peopleGroup)}
+                  >
+                    {group === "all"
+                      ? "همه"
+                      : group === "legacy"
+                        ? "فهرست قبلی"
+                        : roleLabels[group as PersonRole]}{" "}
+                    <Badge tone="gray">
+                      {fa(
+                        data.people.filter(
+                          (p) =>
+                            group === "all" ||
+                            (group === "legacy" && !p.role && !p.reserveOnly) ||
+                            p.role === group ||
+                            (group === "reserve" && p.reserveOnly),
+                        ).length,
+                      )}
+                    </Badge>
+                  </button>
+                ))}
+              </div>
               {data.people.length ? (
                 <div className="table-scroll">
                   <table>
@@ -1270,86 +1487,104 @@ export default function App() {
                         <th>نام و نام خانوادگی</th>
                         <th>کد پرسنلی</th>
                         <th>واحد</th>
-                        <th>نوع همکاری</th>
+                        <th>گروه</th>
+                        <th>شماره تلفن</th>
                         <th>شیفت بعدی</th>
                         <th>وضعیت</th>
                         <th>عملیات</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {data.people.filter(searchMatches).map((p, i) => {
-                        const next = data.shifts
-                          .filter(
-                            (s) => s.date >= today && s.primary.includes(p.id),
-                          )
-                          .sort((a, b) => a.date.localeCompare(b.date))[0];
-                        return (
-                          <tr key={p.id}>
-                            <td>
-                              <button
-                                className="person-cell"
-                                onClick={() => openProfile(p.id)}
-                              >
-                                <Avatar person={p} index={i} />
-                                <span>
-                                  <strong>{p.name}</strong>
-                                  <small>مشاهدهٔ پرونده</small>
-                                </span>
-                              </button>
-                            </td>
-                            <td dir="ltr">
-                              {fa(p.id.startsWith("name:") ? "—" : p.id)}
-                            </td>
-                            <td>{p.department || "—"}</td>
-                            <td>
-                              {p.reserveOnly ? "فقط رزرو" : "اصلی و رزرو"}
-                            </td>
-                            <td>
-                              {next ? (
-                                <>
-                                  <span>{solarLabel(next.date)}</span>
-                                  <small className="block muted">
-                                    {dayDistance(next.date, today) === 0
-                                      ? "امروز"
-                                      : `${fa(dayDistance(next.date, today))} روز دیگر`}
-                                  </small>
-                                </>
-                              ) : (
-                                <span className="muted">
-                                  برنامه‌ای ثبت نشده
-                                </span>
-                              )}
-                            </td>
-                            <td>
-                              <Badge tone={p.active ? "green" : "gray"}>
-                                {p.active ? "فعال" : "غیرفعال"}
-                              </Badge>
-                            </td>
-                            <td>
-                              <button
-                                className="text-button"
-                                onClick={() =>
-                                  commit(
-                                    {
-                                      ...data,
-                                      people: data.people.map((q) =>
-                                        q.id === p.id
-                                          ? { ...q, active: !q.active }
-                                          : q,
-                                      ),
-                                    },
-                                    p.active
-                                      ? "فرد غیرفعال شد؛ سوابق و برنامه‌های قبلی محفوظ است."
-                                      : "فرد فعال شد.",
-                                  )
-                                }
-                              >
-                                {p.active ? "غیرفعال کردن" : "فعال کردن"}
-                              </button>
-                            </td>
-                          </tr>
-                        );
-                      })}
+                      {data.people
+                        .filter(
+                          (p) =>
+                            peopleGroup === "all" ||
+                            (peopleGroup === "legacy" &&
+                              !p.role &&
+                              !p.reserveOnly) ||
+                            p.role === peopleGroup ||
+                            (peopleGroup === "reserve" && p.reserveOnly),
+                        )
+                        .filter(searchMatches)
+                        .map((p, i) => {
+                          const next = data.shifts
+                            .filter(
+                              (s) =>
+                                s.date >= today && s.primary.includes(p.id),
+                            )
+                            .sort((a, b) => a.date.localeCompare(b.date))[0];
+                          return (
+                            <tr key={p.id}>
+                              <td>
+                                <button
+                                  className="person-cell"
+                                  onClick={() => openProfile(p.id)}
+                                >
+                                  <Avatar person={p} index={i} />
+                                  <span>
+                                    <strong>{p.name}</strong>
+                                    <small>مشاهدهٔ پرونده</small>
+                                  </span>
+                                </button>
+                              </td>
+                              <td dir="ltr">
+                                {fa(p.id.startsWith("name:") ? "—" : p.id)}
+                              </td>
+                              <td>{p.department || "—"}</td>
+                              <td>{personRoleLabel(p)}</td>
+                              <td dir="ltr">{p.phone || "—"}</td>
+                              <td>
+                                {next ? (
+                                  <>
+                                    <span>{solarLabel(next.date)}</span>
+                                    <small className="block muted">
+                                      {dayDistance(next.date, today) === 0
+                                        ? "امروز"
+                                        : `${fa(dayDistance(next.date, today))} روز دیگر`}
+                                    </small>
+                                  </>
+                                ) : (
+                                  <span className="muted">
+                                    برنامه‌ای ثبت نشده
+                                  </span>
+                                )}
+                              </td>
+                              <td>
+                                <Badge tone={p.active ? "green" : "gray"}>
+                                  {p.active ? "فعال" : "غیرفعال"}
+                                </Badge>
+                              </td>
+                              <td>
+                                <button
+                                  className="text-button"
+                                  onClick={() => startPersonEdit(p)}
+                                >
+                                  ویرایش مشخصات
+                                </button>
+                                <button
+                                  className="text-button"
+                                  onClick={() =>
+                                    commit(
+                                      {
+                                        ...data,
+                                        people: data.people.map((q) =>
+                                          q.id === p.id
+                                            ? { ...q, active: !q.active }
+                                            : q,
+                                        ),
+                                      },
+                                      p.active
+                                        ? "فرد غیرفعال شد؛ سوابق و برنامه‌های قبلی محفوظ است."
+                                        : "فرد فعال شد.",
+                                    )
+                                  }
+                                >
+                                  {p.active ? "غیرفعال کردن" : "فعال کردن"}
+                                </button>
+                              </td>
+                            </tr>
+                          );
+                        })}
                     </tbody>
                   </table>
                   {!data.people.filter(searchMatches).length && (
@@ -1419,8 +1654,13 @@ export default function App() {
                                 : a.personId === id,
                             );
                             return (
-                              <tr key={`${s.date}-${id}`}>
-                                <td>{solarLabel(s.date)}</td>
+                              <tr key={`${shiftKey(s)}-${id}`}>
+                                <td>
+                                  {solarLabel(s.date)}
+                                  <small className="block muted">
+                                    {shiftTimeLabel(s)}
+                                  </small>
+                                </td>
                                 <td>
                                   <span
                                     className={
@@ -1486,7 +1726,7 @@ export default function App() {
                                     className="text-button"
                                     onClick={() => {
                                       if (page === "attendance")
-                                        startAttendance(s.date, id);
+                                        startAttendance(shiftKey(s), id);
                                       else {
                                         setSelectedDate(s.date);
                                         setDetailOpen(true);
@@ -1503,7 +1743,9 @@ export default function App() {
                                   {page === "reserves" && (
                                     <button
                                       className="text-button"
-                                      onClick={() => startReserveEdit(s.date)}
+                                      onClick={() =>
+                                        startReserveEdit(shiftKey(s))
+                                      }
                                       style={{ marginInlineStart: 16 }}
                                     >
                                       تغییر رزرو
@@ -1536,7 +1778,7 @@ export default function App() {
               )}
               {page === "reserves" && (
                 <ReserveHistory
-                  changes={(data.reserveChanges || []).filter((c) =>
+                  changes={visibleReserveChanges.filter((c) =>
                     dates.includes(c.date),
                   )}
                   name={name}
@@ -1556,13 +1798,12 @@ export default function App() {
                   </p>
                 </div>
                 <Badge tone="gray">
-                  {fa(data.swaps.length + (data.reserveChanges?.length || 0))}{" "}
-                  تغییر
+                  {fa(visibleSwaps.length + visibleReserveChanges.length)} تغییر
                 </Badge>
               </div>
-              {data.swaps.length || data.reserveChanges?.length ? (
+              {visibleSwaps.length || visibleReserveChanges.length ? (
                 <div className="swap-list">
-                  {data.swaps.map((s) => (
+                  {visibleSwaps.map((s) => (
                     <article className="swap-record" key={s.id}>
                       <span className="swap-record-icon">
                         <ArrowLeftRight size={21} />
@@ -1607,7 +1848,7 @@ export default function App() {
                   }
                 />
               )}
-              <ReserveHistory changes={data.reserveChanges || []} name={name} />
+              <ReserveHistory changes={visibleReserveChanges} name={name} />
             </section>
           )}
 
@@ -1740,6 +1981,11 @@ export default function App() {
 
           {page === "settings" && (
             <div className="settings-layout">
+              <ReminderPanel
+                data={data}
+                onSave={(next) => commit(next)}
+                notify={showToast}
+              />
               <AppearancePanel
                 value={appearance}
                 onChange={(value) =>
@@ -1762,6 +2008,13 @@ export default function App() {
                   onSubmit={(e) => {
                     e.preventDefault();
                     if (
+                      settings.leaderCount !== undefined &&
+                      settings.leaderCount > settings.primaryCount
+                    ) {
+                      setError("تعداد مسئول نباید از مجموع نیروها بیشتر باشد.");
+                      return;
+                    }
+                    if (
                       commit(
                         { ...data, settings },
                         "تنظیمات ذخیره شد. برنامه‌های موجود تغییر نکردند.",
@@ -1771,11 +2024,11 @@ export default function App() {
                   }}
                 >
                   <div className="form-grid">
-                    <Field label="تعداد نیروی اصلی در روز">
+                    <Field label="مجموع مسئول و همراه در هر نوبت">
                       <input
                         type="number"
                         min="1"
-                        max="20"
+                        max="2000"
                         required
                         value={settings.primaryCount}
                         onChange={(e) =>
@@ -1786,11 +2039,29 @@ export default function App() {
                         }
                       />
                     </Field>
+                    <Field label="تعداد مسئول شب از مجموع نیروها">
+                      <input
+                        type="number"
+                        min="0"
+                        max={settings.primaryCount}
+                        required
+                        value={
+                          settings.leaderCount ??
+                          Math.min(1, settings.primaryCount)
+                        }
+                        onChange={(e) =>
+                          setSettings({
+                            ...settings,
+                            leaderCount: Number(e.target.value),
+                          })
+                        }
+                      />
+                    </Field>
                     <Field label="تعداد نیروی رزرو در روز">
                       <input
                         type="number"
                         min="0"
-                        max="20"
+                        max="2000"
                         required
                         value={settings.reserveCount}
                         onChange={(e) =>
@@ -1853,6 +2124,7 @@ export default function App() {
                     <Check size={17} />
                     ذخیرهٔ تنظیمات
                   </button>
+                  {error && <ErrorText text={error} />}
                 </form>
               </section>
               <section className="panel settings-panel">
@@ -1986,7 +2258,7 @@ export default function App() {
         >
           <DayDrawer
             date={selectedDate}
-            data={data}
+            data={{ ...data, shifts: visibleShifts }}
             onClose={() => setDetailOpen(false)}
             name={name}
             profile={(id) => {
@@ -1997,14 +2269,15 @@ export default function App() {
               setDetailOpen(false);
               startAttendance(date, id);
             }}
-            swap={() => {
+            swap={(key) => {
               setDetailOpen(false);
-              startSwap(selectedDate);
+              startSwap(key);
             }}
-            reserves={() => {
+            reserves={(key) => {
               setDetailOpen(false);
-              startReserveEdit(selectedDate);
+              startReserveEdit(key);
             }}
+            edit={startShiftEdit}
             event={() => {
               setDetailOpen(false);
               startEvent(selectedDate);
@@ -2024,63 +2297,38 @@ export default function App() {
         />
       )}
       {dialog === "generate" && (
-        <Modal
-          title="ایجاد برنامهٔ عادلانه"
-          subtitle={`${months[month - 1]} ${fa(year)} · شیفت‌های روزانه`}
+        <PlanningDialog
+          data={data}
+          initialListId={activeListId}
+          start={dates[0]}
+          end={dates.at(-1)!}
+          onSave={(next) => {
+            if (
+              commit(next, "برنامهٔ بازهٔ انتخابی با حفظ تاریخچه ذخیره شد.")
+            ) {
+              const plan = next.plans![0];
+              const j = solar(plan.startDate);
+              setYear(j.jy);
+              setMonth(j.jm);
+              setSelectedDate(plan.startDate);
+              setActiveListId(plan.listId || "legacy");
+              setPage("history");
+              return true;
+            }
+            return false;
+          }}
           onClose={close}
-        >
-          <div className="modal-body">
-            <div className="generation-visual">
-              <span className="generation-orbit">
-                <WandSparkles size={34} />
-              </span>
-              <h3>یک برنامه، با در نظر گرفتن همه</h3>
-              <p>
-                تعداد شیفت‌ها، سهم تعطیلات، روزهای هفته و سابقهٔ قبلی بررسی
-                می‌شوند.
-              </p>
-            </div>
-            <div className="generation-facts">
-              <div>
-                <span>نیروی اصلی در روز</span>
-                <b>{fa(data.settings.primaryCount)} نفر</b>
-              </div>
-              <div>
-                <span>نیروی رزرو در روز</span>
-                <b>{fa(data.settings.reserveCount)} نفر</b>
-              </div>
-              <div>
-                <span>حداقل استراحت</span>
-                <b>{fa(data.settings.minRestDays)} روز</b>
-              </div>
-              <div>
-                <span>تعداد روزهای ماه</span>
-                <b>{fa(dates.length)} روز</b>
-              </div>
-            </div>
-            {monthShifts.length > 0 && (
-              <Notice warning>
-                برنامهٔ فعلی این ماه جایگزین می‌شود. ماه دارای سابقهٔ حضور، غیبت
-                یا جابه‌جایی، برای حفظ سوابق بازتولید نمی‌شود.
-              </Notice>
-            )}
-            <Notice>
-              اگر نیروی کافی برای رعایت فاصلهٔ استراحت نباشد، برنامه با هشدار
-              ساخته می‌شود. عدالت یک هدف بهینه‌سازی است و گزارش آن قابل بررسی
-              است.
-            </Notice>
-            {error && <ErrorText text={error} />}
-          </div>
-          <div className="modal-footer">
-            <button className="button button-primary" onClick={handleGenerate}>
-              <WandSparkles size={17} />
-              ساخت برنامهٔ {months[month - 1]}
-            </button>
-            <button className="button button-secondary" onClick={close}>
-              انصراف
-            </button>
-          </div>
-        </Modal>
+        />
+      )}
+      {dialog === "editShift" && (
+        <ShiftEditor
+          data={data}
+          selectedKey={editShiftKey}
+          onSave={(next) =>
+            commit(next, "نفرات شیفت و سابقهٔ ویرایش ذخیره شدند.")
+          }
+          onClose={close}
+        />
       )}
 
       {dialog === "import" && (
@@ -2090,13 +2338,35 @@ export default function App() {
           onClose={close}
           wide
         >
-          <div className="modal-body">
+          <div className="modal-body form-stack">
+            <Field label="گروه فایل‌های بدون نام شیت یا ستون نقش">
+              <Select
+                value={importRole}
+                onChange={(e) =>
+                  setImportRole(e.target.value as PersonRole | "")
+                }
+              >
+                <option value="">تشخیص خودکار / حفظ فهرست قدیمی</option>
+                {Object.entries(roleLabels).map(([id, label]) => (
+                  <option key={id} value={id}>
+                    {label}
+                  </option>
+                ))}
+              </Select>
+            </Field>
+            <Notice>
+              سه فایل را هم‌زمان انتخاب کنید، یا یک فایل با شیت‌های «مسئول شب»،
+              «همراه» و «رزرو» وارد کنید. ستون‌های شماره تلفن و نقش هم خوانده
+              می‌شوند. برای فایل عمومی می‌توانید گروه را پیش از انتخاب فایل مشخص
+              کنید.
+            </Notice>
             <input
               ref={importInput}
               type="file"
               hidden
               accept=".xlsx"
-              onChange={(e) => handleExcel(e.target.files?.[0])}
+              multiple
+              onChange={(e) => handleExcel(Array.from(e.target.files || []))}
             />
             <button
               className="upload-zone"
@@ -2104,7 +2374,7 @@ export default function App() {
               onDragOver={(e) => e.preventDefault()}
               onDrop={(e) => {
                 e.preventDefault();
-                handleExcel(e.dataTransfer.files[0]);
+                handleExcel(Array.from(e.dataTransfer.files));
               }}
               disabled={busy}
             >
@@ -2179,7 +2449,7 @@ export default function App() {
                           <td>{p.name}</td>
                           <td>{p.id.startsWith("name:") ? "—" : fa(p.id)}</td>
                           <td>{p.department || "—"}</td>
-                          <td>{p.reserveOnly ? "فقط رزرو" : "اصلی و رزرو"}</td>
+                          <td>{personRoleLabel(p)}</td>
                         </tr>
                       ))}
                     </tbody>
@@ -2206,8 +2476,8 @@ export default function App() {
 
       {dialog === "person" && (
         <Modal
-          title="افزودن پرسنل"
-          subtitle="اطلاعات عضو جدید تیم را وارد کنید."
+          title={editingPerson ? "ویرایش مشخصات پرسنل" : "افزودن پرسنل"}
+          subtitle="نام، گروه و شماره تماس فرد را ثبت کنید."
           onClose={close}
         >
           <form
@@ -2219,7 +2489,9 @@ export default function App() {
                 setError("کد و نام نمی‌توانند خالی باشند.");
                 return;
               }
-              if (data.people.some((p) => p.id === id)) {
+              if (
+                data.people.some((p) => p.id === id && p.id !== editingPerson)
+              ) {
                 setError("این کد پرسنلی قبلاً ثبت شده است.");
                 return;
               }
@@ -2227,12 +2499,41 @@ export default function App() {
                 commit(
                   {
                     ...data,
-                    people: [
-                      ...data.people,
-                      { ...personForm, id, name: pname, active: true },
-                    ],
+                    people: editingPerson
+                      ? data.people.map((p) =>
+                          p.id === editingPerson
+                            ? {
+                                ...p,
+                                ...personForm,
+                                id,
+                                name: pname,
+                                phone: latin(personForm.phone.trim()),
+                                role: personForm.role || undefined,
+                                reserveOnly:
+                                  personForm.role === "reserve" ||
+                                  (!personForm.role && personForm.reserveOnly),
+                              }
+                            : p,
+                        )
+                      : [
+                          ...data.people,
+                          {
+                            ...personForm,
+                            id,
+                            name: pname,
+                            phone: latin(personForm.phone.trim()),
+                            role: personForm.role || undefined,
+                            active: true,
+                            reserveOnly:
+                              personForm.role === "reserve" ||
+                              (!personForm.role && personForm.reserveOnly),
+                          },
+                        ],
+                    demo: false,
                   },
-                  "پرسنل جدید اضافه شد.",
+                  editingPerson
+                    ? "مشخصات فرد به‌روزرسانی شد؛ شیفت‌ها و سوابق محفوظ است."
+                    : "پرسنل جدید اضافه شد.",
                 )
               )
                 close();
@@ -2255,6 +2556,7 @@ export default function App() {
                   <input
                     required
                     maxLength={100}
+                    disabled={!!editingPerson}
                     value={personForm.id}
                     onChange={(e) =>
                       setPersonForm({ ...personForm, id: e.target.value })
@@ -2274,25 +2576,43 @@ export default function App() {
                   />
                 </Field>
               </div>
-              <label className="checkbox-label">
+              <Field label="شماره تلفن">
                 <input
-                  type="checkbox"
-                  checked={personForm.reserveOnly}
+                  type="tel"
+                  dir="ltr"
+                  maxLength={40}
+                  value={personForm.phone}
+                  onChange={(e) =>
+                    setPersonForm({ ...personForm, phone: e.target.value })
+                  }
+                  placeholder="09123456789"
+                />
+              </Field>
+              <Field label="گروه فرد">
+                <Select
+                  value={personForm.role}
                   onChange={(e) =>
                     setPersonForm({
                       ...personForm,
-                      reserveOnly: e.target.checked,
+                      role: e.target.value as PersonRole | "",
+                      reserveOnly: e.target.value === "reserve",
                     })
                   }
-                />
-                این فرد فقط در فهرست رزرو قرار بگیرد
-              </label>
+                >
+                  <option value="">مشترک؛ سازگار با فهرست قدیمی</option>
+                  {Object.entries(roleLabels).map(([role, label]) => (
+                    <option key={role} value={role}>
+                      {label}
+                    </option>
+                  ))}
+                </Select>
+              </Field>
               {error && <ErrorText text={error} />}
             </div>
             <div className="modal-footer">
               <button className="button button-primary" type="submit">
                 <UserRoundPlus size={17} />
-                افزودن پرسنل
+                {editingPerson ? "ذخیرهٔ مشخصات" : "افزودن پرسنل"}
               </button>
               <button
                 className="button button-secondary"
@@ -2343,8 +2663,8 @@ export default function App() {
                     >
                       <option value="">انتخاب تاریخ</option>
                       {data.shifts.map((s) => (
-                        <option key={s.date} value={s.date}>
-                          {solarLabel(s.date)}
+                        <option key={shiftKey(s)} value={shiftKey(s)}>
+                          {namedShiftLabel(data, s)}
                         </option>
                       ))}
                     </Select>
@@ -2359,7 +2679,7 @@ export default function App() {
                     >
                       <option value="">انتخاب نفر اول</option>
                       {data.shifts
-                        .find((s) => s.date === swapForm.firstDate)
+                        .find((s) => shiftKey(s) === swapForm.firstDate)
                         ?.primary.map((id) => (
                           <option key={id} value={id}>
                             {name(id)}
@@ -2389,8 +2709,8 @@ export default function App() {
                     >
                       <option value="">انتخاب تاریخ</option>
                       {data.shifts.map((s) => (
-                        <option key={s.date} value={s.date}>
-                          {solarLabel(s.date)}
+                        <option key={shiftKey(s)} value={shiftKey(s)}>
+                          {namedShiftLabel(data, s)}
                         </option>
                       ))}
                     </Select>
@@ -2412,10 +2732,10 @@ export default function App() {
                       <option value="">انتخاب نفر دوم</option>
                       {(swapForm.firstDate === swapForm.secondDate
                         ? data.shifts.find(
-                            (s) => s.date === swapForm.secondDate,
+                            (s) => shiftKey(s) === swapForm.secondDate,
                           )?.reserve
                         : data.shifts.find(
-                            (s) => s.date === swapForm.secondDate,
+                            (s) => shiftKey(s) === swapForm.secondDate,
                           )?.primary
                       )?.map((id) => (
                         <option key={id} value={id}>
@@ -2463,13 +2783,13 @@ export default function App() {
       {dialog === "attendance" && (
         <Modal
           title="ثبت حضور و غیاب"
-          subtitle={`${name(attendanceForm.personId)} · ${solarLabel(attendanceForm.date)}`}
+          subtitle={`${name(attendanceForm.personId)} · ${attendanceShift ? namedShiftLabel(data, attendanceShift) : ""}`}
           onClose={close}
         >
           <form
             onSubmit={(e) => {
               e.preventDefault();
-              if (attendanceForm.date > today) {
+              if (attendanceShift && attendanceShift.date > today) {
                 setError("ثبت حضور یا غیبت برای روز آینده مجاز نیست.");
                 return;
               }
@@ -2612,6 +2932,16 @@ export default function App() {
                   )}
                 </>
               )}
+              {attendanceForm.replacementId && (
+                <Notice>
+                  با ذخیرهٔ وضعیت، تأیید می‌کنید که این فرد واقعاً جای{" "}
+                  {attendanceShift
+                    ? primaryRole(attendanceShift, attendanceForm.personId)
+                    : "فرد غایب"}{" "}
+                  خدمت کرده است؛ او به انتهای صف رزرو منتقل می‌شود. انتخاب در
+                  فرم به‌تنهایی صف را تغییر نمی‌دهد.
+                </Notice>
+              )}
               <Field label="توضیحات (اختیاری)">
                 <textarea
                   rows={3}
@@ -2675,7 +3005,7 @@ export default function App() {
                 if (
                   commit(
                     { ...data, events },
-                    "مناسبت ذخیره شد. برای اثرگذاری روی تخصیص، برنامهٔ بدون سابقه را دوباره بسازید.",
+                    "مناسبت ذخیره شد. برنامه‌های قبلی محفوظ‌اند؛ تغییر نفرات از ویرایش شیفت قابل انجام است.",
                   )
                 )
                   close();
@@ -2758,6 +3088,14 @@ export default function App() {
           wide
         >
           <Profile person={profilePerson} data={data} today={today} />
+          <div className="modal-footer">
+            <button
+              className="button button-primary"
+              onClick={() => startPersonEdit(profilePerson)}
+            >
+              ویرایش مشخصات و شماره تلفن
+            </button>
+          </div>
         </Modal>
       )}
       {dialog === "help" && (
@@ -2780,8 +3118,8 @@ export default function App() {
               ],
               [
                 "۲",
-                "برنامهٔ ماه را بسازید",
-                "ماه دلخواه را انتخاب کنید و «ایجاد برنامهٔ عادلانه» را بزنید. پیش‌فرض، روزانه دو نفر اصلی و دو نفر رزرو است.",
+                "برنامهٔ بازهٔ دلخواه را بسازید",
+                "تاریخ شروع، تعداد روزها، ظرفیت مسئول شب، همراه و رزرو و افراد هر برنامه را مشخص کنید. برای چند نوبت در روز، شیفت ساعتی را فعال کنید. همهٔ برنامه‌ها در تاریخچه می‌مانند.",
               ],
               [
                 "۳",
@@ -2957,11 +3295,13 @@ function SearchInput({
 }
 function ShiftTable({
   shifts,
+  listLabel,
   name,
   events,
   onSelect,
 }: {
   shifts: AppData["shifts"];
+  listLabel: (shift: AppData["shifts"][number]) => string;
   name: (id: string) => string;
   events: (date: string) => boolean;
   onSelect: (date: string) => void;
@@ -2971,6 +3311,7 @@ function ShiftTable({
       <table>
         <thead>
           <tr>
+            <th>فهرست / موقعیت</th>
             <th>تاریخ</th>
             <th>روز</th>
             <th>نیروی اصلی</th>
@@ -2980,8 +3321,12 @@ function ShiftTable({
         </thead>
         <tbody>
           {shifts.map((s) => (
-            <tr key={s.date}>
-              <td>{solarLabel(s.date)}</td>
+            <tr key={shiftKey(s)}>
+              <td>{listLabel(s)}</td>
+              <td>
+                {solarLabel(s.date)}
+                <small className="block muted">{shiftTimeLabel(s)}</small>
+              </td>
               <td className={events(s.date) ? "red-text" : ""}>
                 {weekdays[dayOfWeek(s.date)]}
               </td>
@@ -3017,6 +3362,7 @@ function DayDrawer({
   attendance,
   swap,
   reserves,
+  edit,
   event,
 }: {
   date: string;
@@ -3025,11 +3371,17 @@ function DayDrawer({
   name: (id: string) => string;
   profile: (id: string) => void;
   attendance: (date: string, id: string) => void;
-  swap: () => void;
-  reserves: () => void;
+  swap: (key: string) => void;
+  reserves: (key: string) => void;
+  edit: (key: string) => void;
   event: () => void;
 }) {
-  const shift = data.shifts.find((s) => s.date === date),
+  const dayShifts = data.shifts.filter((s) => s.date === date);
+  const [selectedKey, setSelectedKey] = useState(
+    dayShifts[0] ? shiftKey(dayShifts[0]) : "",
+  );
+  const shift =
+      dayShifts.find((s) => shiftKey(s) === selectedKey) || dayShifts[0],
     info = eventsFor(date, data.events, data.settings.hijriOffset);
   return (
     <Modal
@@ -3038,6 +3390,33 @@ function DayDrawer({
       onClose={onClose}
     >
       <div className="modal-body form-stack">
+        {dayShifts.length > 1 && (
+          <Field label="نوبت این روز">
+            <Select
+              value={selectedKey}
+              onChange={(e) => setSelectedKey(e.target.value)}
+            >
+              {dayShifts.map((s) => (
+                <option key={shiftKey(s)} value={shiftKey(s)}>
+                  {listName(data, s)} · {shiftTimeLabel(s)}
+                </option>
+              ))}
+            </Select>
+          </Field>
+        )}
+        {shift && (
+          <div className="section-toolbar">
+            <Badge tone="blue">
+              {listName(data, shift)} · {shiftTimeLabel(shift)}
+            </Badge>
+            <button
+              className="button button-primary button-small"
+              onClick={() => edit(shiftKey(shift))}
+            >
+              ویرایش نفرات شیفت
+            </button>
+          </div>
+        )}
         <div className="three-dates">
           <span>
             <small>شمسی</small>
@@ -3088,13 +3467,14 @@ function DayDrawer({
                     <span>
                       <strong>{name(id)}</strong>
                       <small>
+                        {primaryRole(shift, id)} ·{" "}
                         {a ? statusLabels[a.status] : "وضعیت ثبت نشده"}
                       </small>
                     </span>
                   </button>
                   <button
                     className="button button-small button-secondary"
-                    onClick={() => attendance(date, id)}
+                    onClick={() => attendance(shiftKey(shift), id)}
                   >
                     ثبت وضعیت
                   </button>
@@ -3113,7 +3493,10 @@ function DayDrawer({
                 نیروهای رزرو{" "}
                 <Badge tone="gray">{fa(shift.reserve.length)} نفر</Badge>
               </h3>
-              <button className="text-button" onClick={reserves}>
+              <button
+                className="text-button"
+                onClick={() => reserves(shiftKey(shift))}
+              >
                 <ShieldCheck size={15} />
                 ویرایش رزروهای روز
               </button>
@@ -3140,7 +3523,9 @@ function DayDrawer({
             <div className="reserve-history-in-day">
               <ReserveHistory
                 changes={(data.reserveChanges || []).filter(
-                  (c) => c.date === date,
+                  (c) =>
+                    c.date === date &&
+                    (c.shiftId || c.date) === shiftKey(shift),
                 )}
                 name={name}
               />
@@ -3162,7 +3547,10 @@ function DayDrawer({
       </div>
       <div className="modal-footer">
         {shift && (
-          <button className="button button-primary" onClick={swap}>
+          <button
+            className="button button-primary"
+            onClick={() => swap(shiftKey(shift))}
+          >
             <ArrowLeftRight size={17} />
             جابه‌جایی نفرات
           </button>
@@ -3212,6 +3600,9 @@ function Profile({
             {fa(person.id.startsWith("name:") ? "—" : person.id)}
           </p>
         </div>
+        <span className="profile-phone" dir="ltr">
+          {person.phone || "شماره تلفن ثبت نشده"}
+        </span>
         <Badge tone={person.active ? "green" : "gray"}>
           {person.active ? "فعال" : "غیرفعال"}
         </Badge>
@@ -3263,8 +3654,13 @@ function Profile({
                   (a) => a.replacementId === person.id,
                 );
               return (
-                <tr key={s.date}>
-                  <td>{solarLabel(s.date)}</td>
+                <tr key={shiftKey(s)}>
+                  <td>
+                    {solarLabel(s.date)}
+                    <small className="block muted">
+                      {listName(data, s)} · {shiftTimeLabel(s)}
+                    </small>
+                  </td>
                   <td>
                     {eventsFor(s.date, data.events, data.settings.hijriOffset)
                       .holiday

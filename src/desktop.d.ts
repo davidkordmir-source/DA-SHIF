@@ -6,6 +6,7 @@ declare global {
       readData: () => { ok: boolean; data?: string | null; error?: string };
       writeData: (json: string) => { ok: boolean; error?: string };
       ready: () => void;
+      testReminder: () => Promise<{ ok: boolean; error?: string }>;
       branding: () => Promise<{
         custom: boolean;
         fileName: string;

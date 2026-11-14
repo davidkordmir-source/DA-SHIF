@@ -126,7 +126,7 @@ test("native shell loads the custom splash and persists selected themes and font
   }
 });
 
-test("fourteen different theme designs and eight real Persian fonts work offline and persist", async ({
+test("all theme designs and bundled Persian fonts work offline and persist", async ({
   page,
 }) => {
   const errors: string[] = [];

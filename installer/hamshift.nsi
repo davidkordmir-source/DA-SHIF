@@ -7,7 +7,7 @@ Unicode true
   !error "PROJECT_ROOT is required"
 !endif
 !ifndef APP_VERSION
-  !define APP_VERSION "2.2.0"
+  !define APP_VERSION "2.3.0"
 !endif
 Name "هم‌شیفت"
 OutFile "${PROJECT_ROOT}/out/Hamshift-Setup-${APP_VERSION}-x64.exe"
@@ -73,6 +73,7 @@ Section "Hamshift" SEC_MAIN
 SectionEnd
 
 Section "Uninstall"
+  DeleteRegValue HKCU "Software\Microsoft\Windows\CurrentVersion\Run" "Hamshift"
   SetShellVarContext current
   ${IfNot} ${Silent}
     MessageBox MB_YESNO|MB_ICONQUESTION "فایل‌های برنامه حذف می‌شوند. داده‌های پرسنل و پشتیبان‌ها در پوشهٔ کاربری باقی می‌مانند. ادامه می‌دهید؟" IDYES +2

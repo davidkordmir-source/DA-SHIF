@@ -341,7 +341,8 @@
   --c-fffbf1: #fffbf1;
 }
 
-:root[data-theme="violet"] {
+:root[data-theme="violet"],
+:root[data-theme="indigo"] {
   --c-0c6352: #2f0c63;
   --c-0d5143: #280d51;
   --c-137c66: #3c137c;
@@ -1364,7 +1365,8 @@
   --c-fffbf1: #fffbf1;
 }
 
-:root[data-theme="rose"] {
+:root[data-theme="rose"],
+:root[data-theme="peach"] {
   --c-0c6352: #630c2d;
   --c-0d5143: #510d27;
   --c-137c66: #7c133c;
@@ -1705,7 +1707,8 @@
   --c-fffbf1: #fffbf1;
 }
 
-:root[data-theme="midnight"] {
+:root[data-theme="midnight"],
+:root[data-theme="forest-night"] {
   --c-0c6352: #a0e5d3;
   --c-0d5143: #abe8d7;
   --c-137c66: #8bdfc8;

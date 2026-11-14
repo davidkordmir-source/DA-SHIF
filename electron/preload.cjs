@@ -8,4 +8,5 @@ contextBridge.exposeInMainWorld("desktop", {
   chooseLogo: () => ipcRenderer.invoke("branding:choose"),
   openInstallFolder: () => ipcRenderer.invoke("folder:install"),
   openDataFolder: () => ipcRenderer.invoke("folder:data"),
+  testReminder: () => ipcRenderer.invoke("reminder:test"),
 });

@@ -1,5 +1,32 @@
 export const themes = [
   {
+    id: "peach",
+    name: "هلویی",
+    note: "روشن، گرم و کارت‌های نرم",
+    primary: "#bf5663",
+    surface: "#fff5ef",
+    ink: "#683f45",
+    dark: false,
+  },
+  {
+    id: "indigo",
+    name: "نیلی مخملی",
+    note: "منوی نیلی و نور ملایم",
+    primary: "#6263cc",
+    surface: "#f2f2ff",
+    ink: "#35345c",
+    dark: false,
+  },
+  {
+    id: "forest-night",
+    name: "جنگل شب",
+    note: "سبز تیره با جزئیات مسی",
+    primary: "#86d4b3",
+    surface: "#111f1d",
+    ink: "#e7f8ed",
+    dark: true,
+  },
+  {
     id: "emerald",
     name: "باغ زمرد",
     note: "آرام و الهام‌بخش",
@@ -127,6 +154,18 @@ export const themes = [
   },
 ] as const;
 export const fonts = [
+  {
+    id: "plex",
+    name: "پلکس عربی",
+    note: "مدرن، منظم و حرفه‌ای",
+    family: "IBM Plex Sans Arabic",
+  },
+  {
+    id: "naskh",
+    name: "نوتو نسخ",
+    note: "خوش‌خوان، کتابی و اصیل",
+    family: "Noto Naskh Arabic Variable",
+  },
   {
     id: "vazirmatn",
     name: "وزیرمتن",

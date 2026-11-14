@@ -7,6 +7,7 @@ import "./themes.css";
 import "./appearance.css";
 import "./theme-designs.css";
 import "./reserves.css";
+import "./planning.css";
 
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>

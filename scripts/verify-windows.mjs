@@ -29,7 +29,8 @@ assert.ok(RE.Resource.VersionInfo.fromEntries(resources.entries).some(v => v.get
 const asar = 'out/win-unpacked/resources/app.asar';
 const files = listPackage(asar);
 for (const name of ['/dist/index.html','/electron/main.cjs','/electron/preload.cjs','/electron/splash.html','/electron/splash.js','/assets/hamshift.png','/assets/vazirmatn.woff2']) assert.ok(files.includes(name),`Missing packaged file ${name}`);
-assert.equal(extractFile(asar,'electron/main.cjs').toString(),fs.readFileSync('electron/main.cjs','utf8'),'Packaged desktop code is stale');
+for (const name of ['electron/main.cjs','electron/preload.cjs','electron/reminders.cjs']) assert.equal(extractFile(asar,name).toString(),fs.readFileSync(name,'utf8'),`Packaged desktop code is stale: ${name}`);
+for (const name of ['/assets/font-licenses/ibm-plex-sans-arabic.txt','/assets/font-licenses/noto-naskh-arabic.txt']) assert.ok(files.includes(name),`Missing new font license ${name}`);
 assert.deepEqual(extractFile(asar,'dist/index.html'),fs.readFileSync('dist/index.html'),'Packaged calendar, themes or fonts are stale');
 assert.ok(RE.Resource.VersionInfo.fromEntries(resources.entries).some(v => v.getStringValues({lang:1033,codepage:1200}).FileVersion === `${version}.0`),'Executable version does not match package.json');
 const installer = path.resolve(`out/Hamshift-Setup-${version}-x64.exe`);
