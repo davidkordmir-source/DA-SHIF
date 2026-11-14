@@ -64,10 +64,10 @@ test("manual reserve selection outside the generated pair survives reload, backu
   const excel = await exportReady,
     wb = new ExcelJS.Workbook();
   await wb.xlsx.readFile((await excel.path())!);
-  expect(wb.getWorksheet("جابه‌جایی‌ها")!.getRow(2).getCell(1).text).toBe(
+  expect(wb.getWorksheet("جابه‌جایی‌ها")!.getRow(6).getCell(1).text).toBe(
     "تغییر رزرو",
   );
-  expect(wb.getWorksheet("جابه‌جایی‌ها")!.getRow(2).getCell(4).text).toContain(
+  expect(wb.getWorksheet("جابه‌جایی‌ها")!.getRow(6).getCell(4).text).toContain(
     outside.name,
   );
   await page.getByRole("button", { name: "تنظیمات", exact: true }).click();

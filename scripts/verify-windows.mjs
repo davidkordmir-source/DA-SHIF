@@ -28,8 +28,9 @@ for (let i = 0; i < icons.icons.length; i++) {
 assert.ok(RE.Resource.VersionInfo.fromEntries(resources.entries).some(v => v.getStringValues({lang:1033,codepage:1200}).ProductName === 'Hamshift'));
 const asar = 'out/win-unpacked/resources/app.asar';
 const files = listPackage(asar);
-for (const name of ['/dist/index.html','/electron/main.cjs','/electron/preload.cjs','/electron/splash.html','/electron/splash.js','/assets/hamshift.png','/assets/vazirmatn.woff2']) assert.ok(files.includes(name),`Missing packaged file ${name}`);
+for (const name of ['/dist/index.html','/electron/main.cjs','/electron/preload.cjs','/electron/reminders.mjs','/electron/splash.html','/electron/splash.js','/assets/hamshift.png','/assets/vazirmatn.woff2']) assert.ok(files.includes(name),`Missing packaged file ${name}`);
 assert.equal(extractFile(asar,'electron/main.cjs').toString(),fs.readFileSync('electron/main.cjs','utf8'),'Packaged desktop code is stale');
+assert.equal(extractFile(asar,'electron/reminders.mjs').toString(),fs.readFileSync('electron/reminders.mjs','utf8'),'Packaged reminder engine is stale');
 assert.deepEqual(extractFile(asar,'dist/index.html'),fs.readFileSync('dist/index.html'),'Packaged calendar, themes or fonts are stale');
 assert.ok(RE.Resource.VersionInfo.fromEntries(resources.entries).some(v => v.getStringValues({lang:1033,codepage:1200}).FileVersion === `${version}.0`),'Executable version does not match package.json');
 const installer = path.resolve(`out/Hamshift-Setup-${version}-x64.exe`);

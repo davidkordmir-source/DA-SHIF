@@ -1,5 +1,5 @@
 # Run only in a disposable Windows 10/11 x64 test account.
-param([string]$Installer = "$PSScriptRoot\..\downloads\Hamshift-Setup-2.2.0-x64.exe")
+param([string]$Installer = "$PSScriptRoot\..\out\Hamshift-Setup-2.3.0-x64.exe")
 $ErrorActionPreference = 'Stop'
 $Registry = 'HKCU:\Software\Hamshift'
 $DataDir = Join-Path $env:APPDATA 'Hamshift'

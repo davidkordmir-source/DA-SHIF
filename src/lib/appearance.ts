@@ -167,6 +167,7 @@ export const fonts = [
   { id: "amiri", name: "امیری", note: "نسخ خوشنویسی و رسمی", family: "Amiri" },
 ] as const;
 export type Appearance = {
+  fontScale?: number;
   theme: (typeof themes)[number]["id"];
   font: (typeof fonts)[number]["id"];
 };
@@ -178,6 +179,11 @@ export function validAppearance(value: unknown): value is Appearance {
   if (!value || typeof value !== "object") return false;
   const a = value as Appearance;
   return (
-    themes.some((t) => t.id === a.theme) && fonts.some((f) => f.id === a.font)
+    themes.some((t) => t.id === a.theme) &&
+    fonts.some((f) => f.id === a.font) &&
+    (a.fontScale === undefined ||
+      (Number.isInteger(a.fontScale) &&
+        a.fontScale >= 85 &&
+        a.fontScale <= 140))
   );
 }

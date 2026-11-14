@@ -58,6 +58,7 @@ test("Excel import, generation, export, attendance, swaps, and backup work", asy
   for (let i = 0; i < 12; i++)
     sheet.addRow([String(2001 + i), `همکار آزمایشی ${i + 1}`, "عملیات", "خیر"]);
   const buffer = Buffer.from(await wb.xlsx.writeBuffer());
+  await page.getByRole("button", { name: "ایجاد برنامهٔ عادلانه" }).click();
   await page.getByRole("button", { name: "ورود پرسنل از اکسل" }).click();
   await page.locator("input[type=file]").setInputFiles({
     name: "team.xlsx",
@@ -69,6 +70,7 @@ test("Excel import, generation, export, attendance, swaps, and backup work", asy
   await page.getByRole("button", { name: /تأیید ورود/ }).click();
   expect((await getData(page)).people).toHaveLength(12);
   expect((await getData(page)).shifts).toHaveLength(0);
+  await page.getByRole("button", { name: "انصراف", exact: true }).click();
   await page.getByRole("button", { name: "تنظیمات", exact: true }).click();
   await page.getByLabel("حداقل روز استراحت بین دو شیفت").fill("0");
   await page.getByRole("button", { name: "ذخیرهٔ تنظیمات" }).click();
@@ -134,7 +136,7 @@ test("Excel import, generation, export, attendance, swaps, and backup work", asy
     "گزارش عدالت",
     "جابه‌جایی‌ها",
   ]);
-  expect(downloadedWorkbook.worksheets[0].getRow(2).getCell(8).text).toContain(
+  expect(downloadedWorkbook.worksheets[0].getRow(6).getCell(8).text).toContain(
     "غیبت موجه",
   );
   await page.getByRole("button", { name: "تنظیمات", exact: true }).click();

@@ -7,8 +7,12 @@ import {
   weekdays,
   dayOfWeek,
   eventsFor,
+  todayKey,
+  solarLabel,
 } from "./calendar";
 import { personStats } from "./scheduler";
+import { historyShifts, scheduleLists, listShifts } from "./schedules";
+import { reportRows, reportStatuses, type ReportFilters } from "./reports";
 
 export function download(blob: Blob, name: string) {
   const url = URL.createObjectURL(blob);
@@ -146,8 +150,11 @@ export async function readPeople(
     throw new Error("هیچ نامی در فایل پیدا نشد.");
   return { people, errors };
 }
-export async function exportSchedule(data: AppData, dates: string[]) {
+export function buildScheduleWorkbook(data: AppData, dates: string[]) {
+  if (!dates.length) throw new Error("بازهٔ خروجی خالی است.");
   const wb = new ExcelJS.Workbook();
+  wb.creator = "هم‌شیفت";
+  wb.created = new Date();
   const name = (id: string) => data.people.find((p) => p.id === id)?.name || id;
   const schedule = wb.addWorksheet("برنامه شیفت");
   schedule.addRow([
@@ -179,7 +186,28 @@ export async function exportSchedule(data: AppData, dates: string[]) {
         .join(" | ") || "",
     ]);
   }
-  styleSheet(schedule);
+  const listByDate = new Map(
+    scheduleLists(data).flatMap((l) =>
+      listShifts(data, l).map((s) => [s.date, l] as const),
+    ),
+  );
+  schedule.getRow(1).getCell(9).value = "فهرست برنامه";
+  schedule.getRow(1).getCell(10).value = "محل خدمت";
+  dates.forEach((date, i) => {
+    schedule.getRow(i + 2).getCell(9).value = listByDate.get(date)?.name || "";
+    schedule.getRow(i + 2).getCell(10).value =
+      listByDate.get(date)?.location || "";
+  });
+  professionalSheet(
+    schedule,
+    "برنامهٔ شیفت پرسنل",
+    `${solarLabel(dates[0])} تا ${solarLabel(dates.at(-1)!)}`,
+    `${fa(dates.length)} روز · ${fa(data.people.length)} نفر`,
+    [18, 16, 16, 14, 34, 34, 46, 56, 30, 24],
+    dates.map(
+      (date) => eventsFor(date, data.events, data.settings.hijriOffset).holiday,
+    ),
+  );
   const report = wb.addWorksheet("گزارش عدالت");
   report.addRow([
     "کد",
@@ -203,7 +231,7 @@ export async function exportSchedule(data: AppData, dates: string[]) {
     );
     const prior = personStats(
       p.id,
-      data.shifts.filter((s) => s.date < dates[0]),
+      historyShifts(data).filter((s) => s.date < dates[0]),
       data,
     );
     report.addRow([
@@ -221,7 +249,25 @@ export async function exportSchedule(data: AppData, dates: string[]) {
       prior.workloadFriday,
     ]);
   }
-  styleSheet(report);
+  professionalSheet(
+    report,
+    "گزارش عدالت و سهم شیفت‌ها",
+    `${solarLabel(dates[0])} تا ${solarLabel(dates.at(-1)!)}`,
+    "سوابق قبلی شامل حق شیفت‌های محفوظ در بایگانی است",
+    [18, 28, 16, 16, 16, 16, 16, 18, 18, 18, 22, 22],
+  );
+  if (report.rowCount > 5)
+    report.addConditionalFormatting({
+      ref: `C6:F${report.rowCount}`,
+      rules: [
+        {
+          type: "colorScale",
+          priority: 1,
+          cfvo: [{ type: "min" }, { type: "max" }],
+          color: [{ argb: "FFE8F4F2" }, { argb: "FF65B7A6" }],
+        },
+      ],
+    });
   const swaps = wb.addWorksheet("جابه‌جایی‌ها");
   swaps.addRow([
     "نوع تغییر",
@@ -257,9 +303,261 @@ export async function exportSchedule(data: AppData, dates: string[]) {
       change.createdAt,
     ]);
   }
-  styleSheet(swaps);
+  professionalSheet(
+    swaps,
+    "تاریخچهٔ جابه‌جایی و تغییر رزرو",
+    `${solarLabel(dates[0])} تا ${solarLabel(dates.at(-1)!)}`,
+    `${fa(swaps.rowCount - 1)} تغییر ثبت‌شده`,
+    [24, 34, 18, 34, 18, 50, 28],
+  );
+  return wb;
+}
+export async function exportSchedule(data: AppData, dates: string[]) {
   await writeWorkbook(
-    wb,
+    buildScheduleWorkbook(data, dates),
     `برنامه-شیفت-${solarInput(dates[0]).slice(0, 7).replace("/", "-")}.xlsx`,
+  );
+}
+
+function professionalSheet(
+  sheet: ExcelJS.Worksheet,
+  title: string,
+  range: string,
+  summary: string,
+  widths: number[],
+  holidays: boolean[] = [],
+) {
+  const columns = widths.length;
+  sheet.spliceRows(
+    1,
+    0,
+    [title],
+    [`بازه: ${range}  |  تهیه‌شده: ${solarLabel(todayKey())}`],
+    [summary],
+    [],
+  );
+  for (let row = 1; row <= 3; row++) sheet.mergeCells(row, 1, row, columns);
+  sheet.getRow(1).height = 40;
+  sheet.getRow(2).height = 28;
+  sheet.getRow(3).height = 26;
+  for (const row of [1, 2, 3]) {
+    sheet.getRow(row).font = {
+      name: "Tahoma",
+      size: row === 1 ? 18 : 11,
+      bold: row !== 2,
+      color: { argb: row === 1 ? "FFFFFFFF" : "FF244C55" },
+    };
+    sheet.getRow(row).fill = {
+      type: "pattern",
+      pattern: "solid",
+      fgColor: { argb: row === 1 ? "FF153F4A" : "FFE8F3F2" },
+    };
+    sheet.getRow(row).alignment = {
+      horizontal: "right",
+      vertical: "middle",
+      wrapText: true,
+      readingOrder: "rtl",
+    };
+  }
+  sheet.getRow(5).height = 34;
+  sheet.getRow(5).font = {
+    name: "Tahoma",
+    size: 11,
+    bold: true,
+    color: { argb: "FFFFFFFF" },
+  };
+  sheet.getRow(5).fill = {
+    type: "pattern",
+    pattern: "solid",
+    fgColor: { argb: "FF147E68" },
+  };
+  sheet.getRow(5).alignment = {
+    horizontal: "center",
+    vertical: "middle",
+    wrapText: true,
+  };
+  widths.forEach((width, i) => {
+    sheet.getColumn(i + 1).width = width;
+  });
+  for (let row = 6; row <= sheet.rowCount; row++) {
+    const r = sheet.getRow(row);
+    r.height = 42;
+    r.eachCell({ includeEmpty: true }, (cell) => {
+      cell.font = { name: "Tahoma", size: 11, color: { argb: "FF233F47" } };
+      cell.alignment = {
+        vertical: "middle",
+        horizontal: "right",
+        wrapText: true,
+        readingOrder: "rtl",
+      };
+      cell.fill = {
+        type: "pattern",
+        pattern: "solid",
+        fgColor: {
+          argb: holidays[row - 6]
+            ? "FFFFF0DD"
+            : row % 2
+              ? "FFF0F6F8"
+              : "FFFFFFFF",
+        },
+      };
+      cell.border = { bottom: { style: "hair", color: { argb: "FFD7E5E6" } } };
+    });
+  }
+  sheet.views = [
+    { rightToLeft: true, state: "frozen", ySplit: 5, showGridLines: false },
+  ];
+  sheet.autoFilter = {
+    from: { row: 5, column: 1 },
+    to: { row: Math.max(5, sheet.rowCount), column: columns },
+  };
+  sheet.pageSetup = {
+    orientation: "landscape",
+    paperSize: 9,
+    fitToPage: true,
+    fitToWidth: 1,
+    fitToHeight: 0,
+    printTitlesRow: "1:5",
+    margins: {
+      left: 0.25,
+      right: 0.25,
+      top: 0.4,
+      bottom: 0.4,
+      header: 0.15,
+      footer: 0.2,
+    },
+  };
+  sheet.headerFooter = { oddFooter: "&Rهم‌شیفت — گزارش پرسنل&Cصفحه &P از &N" };
+}
+
+export function buildReportWorkbook(data: AppData, filters: ReportFilters) {
+  const rows = reportRows(data, filters),
+    wb = new ExcelJS.Workbook();
+  wb.creator = "هم‌شیفت";
+  wb.created = new Date();
+  const sheet = wb.addWorksheet("گزارش فیلترشده");
+  sheet.addRow([
+    "تاریخ شمسی",
+    "تاریخ میلادی",
+    "روز هفته",
+    "نوع روز",
+    "کد پرسنلی",
+    "نام و نام خانوادگی",
+    "واحد",
+    "محل خدمت",
+    "فهرست برنامه",
+    "نقش",
+    "وضعیت",
+    "توضیحات",
+    "منبع",
+  ]);
+  for (const row of rows)
+    sheet.addRow([
+      solarInput(row.date),
+      row.date,
+      weekdays[dayOfWeek(row.date)],
+      row.holiday ? "تعطیل" : "عادی",
+      row.personId,
+      row.name,
+      row.department,
+      row.location,
+      row.schedule,
+      row.role,
+      reportStatuses[row.status],
+      row.note,
+      row.archived ? "حق شیفت بایگانی‌شده" : "برنامهٔ فعال",
+    ]);
+  professionalSheet(
+    sheet,
+    "گزارش کارکرد و وضعیت شیفت‌ها",
+    `${solarLabel(filters.start)} تا ${solarLabel(filters.end)}`,
+    `واحد: ${filters.department || "همه"} · وضعیت: ${reportStatuses[filters.status as keyof typeof reportStatuses] || "همهٔ افراد دارای نقش"} · ${fa(rows.length)} ردیف · ${fa(new Set(rows.map((r) => r.personId)).size)} نفر`,
+    [18, 16, 16, 14, 18, 30, 22, 24, 30, 16, 24, 44, 26],
+    rows.map((r) => r.holiday),
+  );
+  const summary = wb.addWorksheet("خلاصهٔ واحدها");
+  summary.addRow([
+    "واحد",
+    "اصلی",
+    "رزرو",
+    "حاضر",
+    "جایگزین",
+    "غایب",
+    "حضور ثبت نشده",
+    "بدون شیفت",
+  ]);
+  for (const department of [...new Set(rows.map((r) => r.department))]) {
+    const selected = rows.filter((r) => r.department === department);
+    summary.addRow([
+      department || "بدون واحد",
+      ...[
+        (r: (typeof rows)[number]) => r.role === "اصلی",
+        (r: (typeof rows)[number]) => r.role === "رزرو",
+        (r: (typeof rows)[number]) => r.status === "present",
+        (r: (typeof rows)[number]) => r.status === "replacement",
+        (r: (typeof rows)[number]) =>
+          r.status === "excused" || r.status === "unexcused",
+        (r: (typeof rows)[number]) => r.status === "unrecorded",
+        (r: (typeof rows)[number]) => r.status === "off",
+      ].map((predicate) => selected.filter(predicate).length),
+    ]);
+  }
+  professionalSheet(
+    summary,
+    "خلاصهٔ گزارش بر اساس واحد",
+    `${solarLabel(filters.start)} تا ${solarLabel(filters.end)}`,
+    "اعداد بر حسب نفر ـ روز و بر اساس همین فیلترها هستند؛ حضور ثبت‌نشده به معنی غیبت نیست.",
+    [30, 18, 18, 18, 18, 18, 22, 18],
+  );
+  const parameters = wb.addWorksheet("فیلترهای گزارش");
+  parameters.addRows([
+    ["پارامتر", "انتخاب کاربر"],
+    ["از تاریخ", solarLabel(filters.start)],
+    ["تا تاریخ", solarLabel(filters.end)],
+    ["واحد", filters.department || "همهٔ واحدها"],
+    [
+      "پرسنل",
+      data.people.find((p) => p.id === filters.personId)?.name ||
+        filters.personId ||
+        "همهٔ پرسنل",
+    ],
+    [
+      "فهرست برنامه",
+      [
+        ...scheduleLists(data),
+        ...(data.archives || []).map((a) => a.schedule),
+      ].find((s) => s.id === filters.scheduleId)?.name || "همهٔ فهرست‌ها",
+    ],
+    ["محل خدمت", filters.location || "همهٔ موقعیت‌ها"],
+    [
+      "وضعیت",
+      reportStatuses[filters.status as keyof typeof reportStatuses] ||
+        "همهٔ افراد دارای نقش",
+    ],
+    [
+      "نوع روز",
+      (
+        { normal: "عادی", holiday: "تعطیل", friday: "جمعه" } as Record<
+          string,
+          string
+        >
+      )[filters.dayType] || "همهٔ روزها",
+    ],
+    ["شامل حق شیفت بایگانی", filters.includeArchive ? "بله" : "خیر"],
+    ["تعداد ردیف نتیجه", rows.length],
+  ]);
+  professionalSheet(
+    parameters,
+    "مشخصات و فیلترهای گزارش",
+    `${solarLabel(filters.start)} تا ${solarLabel(filters.end)}`,
+    "این فیلترها عیناً بر ردیف‌های گزارش و خلاصهٔ واحدها اعمال شده‌اند.",
+    [32, 84],
+  );
+  return wb;
+}
+export async function exportReport(data: AppData, filters: ReportFilters) {
+  await writeWorkbook(
+    buildReportWorkbook(data, filters),
+    `گزارش-شیفت-${solarInput(filters.start).replaceAll("/", "-")}-${solarInput(filters.end).replaceAll("/", "-")}.xlsx`,
   );
 }

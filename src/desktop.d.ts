@@ -3,6 +3,7 @@ declare global {
   interface Window {
     desktop?: {
       platform: string;
+      reminderStatus: () => Promise<boolean>;
       readData: () => { ok: boolean; data?: string | null; error?: string };
       writeData: (json: string) => { ok: boolean; error?: string };
       ready: () => void;

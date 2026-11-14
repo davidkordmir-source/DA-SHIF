@@ -6,6 +6,7 @@ const {
   shell,
   nativeImage,
   session,
+  Notification,
 } = require("electron");
 const fs = require("node:fs");
 const path = require("node:path");
@@ -60,6 +61,10 @@ function setupIpc() {
   ipcMain.on("app:ready", (event) => {
     if (validSender(event)) reveal();
   });
+  ipcMain.handle(
+    "reminder:status",
+    (event) => validSender(event) && Notification.isSupported(),
+  );
   ipcMain.handle("branding:read", (event) => {
     if (!validSender(event, true)) throw new Error("Invalid sender");
     return loadBranding(installDirectory, ICON);
@@ -181,6 +186,7 @@ async function start() {
       nodeIntegration: false,
       contextIsolation: true,
       sandbox: true,
+      backgroundThrottling: false,
       devTools: testing,
     },
   });
@@ -199,6 +205,7 @@ async function start() {
       nodeIntegration: false,
       contextIsolation: true,
       sandbox: true,
+      backgroundThrottling: false,
       devTools: testing,
     },
   });
@@ -232,5 +239,51 @@ async function start() {
   });
   await mainWindow.loadFile(path.join(APP_ROOT, "dist", "index.html"));
   showTimer = setTimeout(reveal, 15000);
+  // Native reminders keep running while the window is minimized. Delivery keys
+  // live beside user data and are persisted, so restarting cannot notify twice.
+  const { dueReminders } = await import("./reminders.mjs");
+  const deliveryPath = path.join(
+    app.getPath("userData"),
+    "reminder-deliveries.json",
+  );
+  let delivered = [];
+  try {
+    const value = JSON.parse(fs.readFileSync(deliveryPath, "utf8"));
+    if (Array.isArray(value))
+      delivered = value.filter((k) => typeof k === "string");
+  } catch {
+    /* First run. */
+  }
+  const checkReminders = () => {
+    if (!Notification.isSupported()) return;
+    try {
+      const result = storage.read();
+      if (!result.ok || !result.data) return;
+      for (const item of dueReminders(JSON.parse(result.data))) {
+        if (delivered.includes(item.key)) continue;
+        const notification = new Notification({
+          title: item.title,
+          body: item.body,
+          icon: ICON,
+        });
+        notification.on("click", () => {
+          if (mainWindow) {
+            mainWindow.restore();
+            mainWindow.show();
+            mainWindow.focus();
+          }
+        });
+        notification.show();
+        delivered = [...delivered, item.key].slice(-2000);
+        fs.writeFileSync(`${deliveryPath}.tmp`, JSON.stringify(delivered));
+        fs.renameSync(`${deliveryPath}.tmp`, deliveryPath);
+      }
+    } catch {
+      /* In-app reminders remain available if the OS service fails. */
+    }
+  };
+  checkReminders();
+  const reminderTimer = setInterval(checkReminders, 15000);
+  app.once("before-quit", () => clearInterval(reminderTimer));
 }
 app.on("window-all-closed", () => app.quit());

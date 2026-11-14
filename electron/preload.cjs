@@ -1,6 +1,7 @@
 const { contextBridge, ipcRenderer } = require("electron");
 contextBridge.exposeInMainWorld("desktop", {
   platform: process.platform,
+  reminderStatus: () => ipcRenderer.invoke("reminder:status"),
   readData: () => ipcRenderer.sendSync("data:read"),
   writeData: (json) => ipcRenderer.sendSync("data:write", json),
   ready: () => ipcRenderer.send("app:ready"),

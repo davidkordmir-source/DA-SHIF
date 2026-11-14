@@ -68,7 +68,7 @@ import {
 } from "./lib/calendar";
 import {
   applySwap,
-  generateSchedule,
+  createSchedule,
   personStats,
   recordAttendance,
 } from "./lib/scheduler";
@@ -86,6 +86,12 @@ import { ReserveEditor, ReserveHistory } from "./ReserveEditor";
 import { defaultAppearance, themes } from "./lib/appearance";
 import { hasIranCalendar, CALENDAR_ANNUAL_YEAR } from "./lib/iran-calendar";
 import { useToday } from "./lib/use-today";
+import { DatePicker } from "./DatePicker";
+import { ScheduleManager, LocationsPanel } from "./ScheduleManager";
+import { ReportsPanel } from "./ReportsPanel";
+import { ResetPanel } from "./ResetPanel";
+import { ReminderPanel, useShiftReminder } from "./ReminderPanel";
+import { historyShifts, scheduleLists } from "./lib/schedules";
 
 type Page =
   | "schedule"
@@ -128,12 +134,16 @@ export default function App() {
   useLayoutEffect(() => {
     document.documentElement.dataset.theme = appearance.theme;
     document.documentElement.dataset.font = appearance.font;
+    document.documentElement.style.setProperty(
+      "--font-scale",
+      String((appearance.fontScale || 100) / 100),
+    );
     document.documentElement.style.colorScheme = themes.find(
       (t) => t.id === appearance.theme,
     )?.dark
       ? "dark"
       : "light";
-  }, [appearance.theme, appearance.font]);
+  }, [appearance.theme, appearance.font, appearance.fontScale]);
   useEffect(() => {
     document.fonts.ready.then(() => window.desktop?.ready());
   }, []);
@@ -149,6 +159,8 @@ export default function App() {
     nowSolar = solar(today);
   const [year, setYear] = useState(nowSolar.jy),
     [month, setMonth] = useState(nowSolar.jm);
+  const [selectedSchedule, setSelectedSchedule] = useState("");
+  const [importReturn, setImportReturn] = useState(false);
   const [selectedDate, setSelectedDate] = useState(today);
   const [detailOpen, setDetailOpen] = useState(false);
   const [view, setView] = useState<"calendar" | "list">("calendar");
@@ -202,10 +214,23 @@ export default function App() {
   );
   const dates = useMemo(() => monthDates(year, month), [year, month]);
   const publishedCalendar = dates.every(hasIranCalendar);
-  const generateResult = data.schedulingWarnings?.[dates[0]] || [];
+  const generateResult = Object.entries(data.schedulingWarnings || {})
+    .filter(([date]) => dates.includes(date))
+    .flatMap(([, warnings]) => warnings);
   const monthShifts = useMemo(
-    () => data.shifts.filter((s) => dates.includes(s.date)),
-    [data.shifts, dates],
+    () =>
+      data.shifts.filter(
+        (s) =>
+          dates.includes(s.date) &&
+          (page !== "schedule" ||
+            !selectedSchedule ||
+            (selectedSchedule.startsWith("legacy:")
+              ? !s.scheduleId &&
+                selectedSchedule ===
+                  `legacy:${solar(s.date).jy}-${solar(s.date).jm}`
+              : s.scheduleId === selectedSchedule)),
+      ),
+    [data.shifts, dates, selectedSchedule, page],
   );
   const monthEvents = dates
     .map((date) => ({
@@ -214,7 +239,31 @@ export default function App() {
     }))
     .filter((e) => e.events.length);
   const activePeople = data.people.filter((p) => p.active);
-  const normalPeople = activePeople.filter((p) => !p.reserveOnly);
+  const [generation, setGeneration] = useState({
+    name: `برنامهٔ ${months[month - 1]} ${year}`,
+    start: dates[0],
+    end: dates.at(-1)!,
+    personIds: activePeople.map((p) => p.id),
+    location: "",
+  });
+  const startGenerate = () => {
+    setGeneration({
+      name: `برنامهٔ ${months[month - 1]} ${year}`,
+      start: dates[0],
+      end: dates.at(-1)!,
+      personIds: activePeople.map((p) => p.id),
+      location: "",
+    });
+    open("generate");
+  };
+  const selectedMembers =
+    page === "schedule" && selectedSchedule
+      ? scheduleLists(data).find((s) => s.id === selectedSchedule)?.personIds
+      : null;
+  const normalPeople = activePeople.filter(
+    (p) =>
+      !p.reserveOnly && (!selectedMembers || selectedMembers.includes(p.id)),
+  );
   const holidays = dates.filter(
     (d) => eventsFor(d, data.events, data.settings.hijriOffset).holiday,
   );
@@ -246,11 +295,13 @@ export default function App() {
   const person = (id: string) => data.people.find((p) => p.id === id);
   const name = (id: string) => person(id)?.name || "فرد حذف‌شده";
   const showToast = (message: string) => setToast(message);
+  useShiftReminder(data, showToast);
   const open = (d: Dialog) => {
     setError("");
     setDialog(d);
   };
   const close = () => {
+    setImportReturn(false);
     setDialog(null);
     setError("");
   };
@@ -356,31 +407,22 @@ export default function App() {
   };
   const handleGenerate = () => {
     try {
-      if (
-        monthShifts.some((s) => s.attendance.length) ||
-        data.swaps.some(
-          (s) => dates.includes(s.firstDate) || dates.includes(s.secondDate),
-        ) ||
-        data.reserveChanges?.some((c) => dates.includes(c.date))
-      )
-        throw new Error(
-          "این ماه سابقهٔ حضور، غیبت، جابه‌جایی یا ویرایش رزرو دارد. برای حفظ سوابق، بازتولید مجاز نیست. ماه دیگری انتخاب کنید.",
-        );
-      const result = generateSchedule(data, year, month);
+      const next = createSchedule(data, generation);
+      const warnings = next.schedulingWarnings?.[generation.start] || [];
       if (
         commit(
-          {
-            ...data,
-            shifts: result.shifts,
-            schedulingWarnings: {
-              ...data.schedulingWarnings,
-              [dates[0]]: result.warnings,
-            },
-          },
-          "برنامهٔ ماه با موفقیت ساخته و ذخیره شد.",
+          next,
+          warnings.length
+            ? `برنامه ذخیره شد؛ ${fa(warnings.length)} هشدار استراحت دارد.`
+            : "برنامه با موفقیت ساخته و ذخیره شد.",
         )
-      )
+      ) {
+        const j = solar(generation.start);
+        setYear(j.jy);
+        setMonth(j.jm);
+        setSelectedSchedule(next.schedules!.at(-1)!.id);
         close();
+      }
     } catch (e) {
       setError((e as Error).message);
     }
@@ -436,14 +478,28 @@ export default function App() {
     ) {
       setImported([]);
       setFileName("");
-      close();
-      setPage("people");
+      if (importReturn) {
+        setGeneration((g) => ({
+          ...g,
+          personIds: people.filter((p) => p.active).map((p) => p.id),
+        }));
+        setImportReturn(false);
+        open("generate");
+      } else {
+        close();
+        setPage("people");
+      }
     }
   };
   const handleExport = async () => {
     setBusy(true);
     try {
-      await exportSchedule(data, dates);
+      await exportSchedule(
+        data,
+        page === "schedule" && selectedSchedule
+          ? monthShifts.map((s) => s.date)
+          : dates,
+      );
       showToast("فایل اکسل برنامه و گزارش‌ها آماده شد.");
     } catch {
       showToast("ساخت خروجی اکسل انجام نشد. دوباره تلاش کنید.");
@@ -548,8 +604,8 @@ export default function App() {
     !!attendanceShift &&
     !attendanceShift.reserve.includes(attendanceForm.replacementId);
   const priorShifts = useMemo(
-    () => data.shifts.filter((s) => s.date < dates[0]),
-    [data.shifts, dates],
+    () => historyShifts(data).filter((s) => s.date < dates[0]),
+    [data.shifts, data.archives, dates],
   );
   const priorMonthCount = useMemo(
     () => new Set(priorShifts.map((s) => solarInput(s.date).slice(0, 7))).size,
@@ -656,7 +712,7 @@ export default function App() {
               <b>مدیر سیستم</b>
               <small>فضای کاری شخصی</small>
             </div>
-            <span className="version">۲.۲</span>
+            <span className="version">۲.۳</span>
           </div>
         </div>
       </aside>
@@ -723,19 +779,14 @@ export default function App() {
                 <>
                   <button
                     className="button button-secondary"
-                    onClick={() => {
-                      setImported([]);
-                      setImportErrors([]);
-                      setFileName("");
-                      open("import");
-                    }}
+                    onClick={() => setPage("reports")}
                   >
-                    <Upload size={17} />
-                    ورود پرسنل از اکسل
+                    <BarChart3 size={17} />
+                    گزارش‌گیری
                   </button>
                   <button
                     className="button button-primary"
-                    onClick={() => open("generate")}
+                    onClick={startGenerate}
                   >
                     <WandSparkles size={18} />
                     ایجاد برنامهٔ عادلانه
@@ -748,6 +799,7 @@ export default function App() {
                     onClick={() => {
                       setImported([]);
                       setImportErrors([]);
+                      setImportReturn(false);
                       open("import");
                     }}
                   >
@@ -846,6 +898,21 @@ export default function App() {
 
           {page === "schedule" && (
             <>
+              <ScheduleManager
+                data={data}
+                onSave={commit}
+                selected={selectedSchedule}
+                onBackup={backup}
+                onSelect={(list) => {
+                  setSelectedSchedule(list?.id || "");
+                  setDetailOpen(false);
+                  if (list) {
+                    const j = solar(list.startDate);
+                    setYear(j.jy);
+                    setMonth(j.jm);
+                  }
+                }}
+              />
               <section className="stats-grid" aria-label="آمار ماه">
                 <StatCard
                   label="پرسنل فعال"
@@ -1011,7 +1078,7 @@ export default function App() {
                             ),
                           )}
                           {dates.map((date) => {
-                            const shift = data.shifts.find(
+                            const shift = monthShifts.find(
                                 (s) => s.date === date,
                               ),
                               info = eventsFor(
@@ -1526,7 +1593,7 @@ export default function App() {
                       className="button button-primary"
                       onClick={() => {
                         setPage("schedule");
-                        open("generate");
+                        startGenerate();
                       }}
                     >
                       ایجاد برنامه
@@ -1613,6 +1680,12 @@ export default function App() {
 
           {page === "reports" && (
             <>
+              <ReportsPanel
+                data={data}
+                start={dates[0]}
+                end={dates.at(-1)!}
+                notify={showToast}
+              />
               <div className="stats-grid">
                 <StatCard
                   label="اختلاف کل شیفت‌ها"
@@ -1749,6 +1822,32 @@ export default function App() {
                   )
                 }
                 notify={showToast}
+              />
+              <ReminderPanel data={data} onSave={commit} />
+              <LocationsPanel data={data} onSave={commit} />
+              <ResetPanel
+                onBackup={backup}
+                onReset={(next) => {
+                  if (
+                    !commit(
+                      next,
+                      "نرم‌افزار با محیط خالی و تنظیمات اولیه بازنشانی شد.",
+                    )
+                  )
+                    return false;
+                  setSettings(next.settings);
+                  setSelectedSchedule("");
+                  setPage("schedule");
+                  setDetailOpen(false);
+                  setQuery("");
+                  setFilter("all");
+                  setYear(nowSolar.jy);
+                  setMonth(nowSolar.jm);
+                  setSelectedDate(today);
+                  setCalendar("solar");
+                  setView("calendar");
+                  return true;
+                }}
               />
               <section className="panel settings-panel">
                 <div className="settings-title">
@@ -2026,55 +2125,146 @@ export default function App() {
       {dialog === "generate" && (
         <Modal
           title="ایجاد برنامهٔ عادلانه"
-          subtitle={`${months[month - 1]} ${fa(year)} · شیفت‌های روزانه`}
+          subtitle={`${solarLabel(generation.start)} تا ${solarLabel(generation.end)} · شیفت‌های روزانه`}
           onClose={close}
         >
-          <div className="modal-body">
+          <div className="modal-body form-stack">
             <div className="generation-visual">
               <span className="generation-orbit">
                 <WandSparkles size={34} />
               </span>
               <h3>یک برنامه، با در نظر گرفتن همه</h3>
               <p>
-                تعداد شیفت‌ها، سهم تعطیلات، روزهای هفته و سابقهٔ قبلی بررسی
-                می‌شوند.
+                بازه، اعضا و محل خدمت را انتخاب کنید؛ سابقهٔ قبلی و استراحت
+                بررسی می‌شوند.
               </p>
+            </div>
+            <Field label="نام فهرست برنامه">
+              <input
+                maxLength={100}
+                value={generation.name}
+                onChange={(e) =>
+                  setGeneration({ ...generation, name: e.target.value })
+                }
+              />
+            </Field>
+            <div className="form-grid">
+              <DatePicker
+                label="تاریخ شروع برنامه"
+                value={generation.start}
+                onChange={(v) => setGeneration({ ...generation, start: v })}
+              />
+              <DatePicker
+                label="تاریخ پایان برنامه"
+                value={generation.end}
+                onChange={(v) => setGeneration({ ...generation, end: v })}
+              />
+              <Field label="محل خدمت برنامه">
+                <Select
+                  value={generation.location}
+                  onChange={(e) =>
+                    setGeneration({ ...generation, location: e.target.value })
+                  }
+                >
+                  <option value="">بدون موقعیت مشخص</option>
+                  {(data.locations || []).map((l) => (
+                    <option key={l}>{l}</option>
+                  ))}
+                </Select>
+              </Field>
+            </div>
+            <div className="generation-team">
+              <div className="section-toolbar">
+                <div>
+                  <h3>اعضای این فهرست</h3>
+                  <p>{fa(generation.personIds.length)} نفر انتخاب شده</p>
+                </div>
+                <button
+                  className="button button-secondary"
+                  onClick={() => {
+                    setImported([]);
+                    setImportErrors([]);
+                    setFileName("");
+                    setImportReturn(true);
+                    open("import");
+                  }}
+                >
+                  <Upload size={16} />
+                  ورود پرسنل از اکسل
+                </button>
+              </div>
+              <div className="row-actions">
+                <button
+                  className="text-button"
+                  onClick={() =>
+                    setGeneration({
+                      ...generation,
+                      personIds: activePeople.map((p) => p.id),
+                    })
+                  }
+                >
+                  انتخاب همه
+                </button>
+                <button
+                  className="text-button"
+                  onClick={() =>
+                    setGeneration({ ...generation, personIds: [] })
+                  }
+                >
+                  لغو انتخاب همه
+                </button>
+              </div>
+              <div className="generation-people">
+                {activePeople.map((p) => (
+                  <label className="checkbox-label" key={p.id}>
+                    <input
+                      type="checkbox"
+                      checked={generation.personIds.includes(p.id)}
+                      onChange={(e) =>
+                        setGeneration({
+                          ...generation,
+                          personIds: e.target.checked
+                            ? [...generation.personIds, p.id]
+                            : generation.personIds.filter((id) => id !== p.id),
+                        })
+                      }
+                    />
+                    <span>
+                      {p.name}
+                      <small>
+                        {p.department}
+                        {p.reserveOnly ? " · فقط رزرو" : ""}
+                      </small>
+                    </span>
+                  </label>
+                ))}
+              </div>
             </div>
             <div className="generation-facts">
               <div>
-                <span>نیروی اصلی در روز</span>
-                <b>{fa(data.settings.primaryCount)} نفر</b>
+                <span>نیروی اصلی روزانه</span>
+                <b>{fa(data.settings.primaryCount)}</b>
               </div>
               <div>
-                <span>نیروی رزرو در روز</span>
-                <b>{fa(data.settings.reserveCount)} نفر</b>
+                <span>رزرو روزانه</span>
+                <b>{fa(data.settings.reserveCount)}</b>
               </div>
               <div>
                 <span>حداقل استراحت</span>
                 <b>{fa(data.settings.minRestDays)} روز</b>
               </div>
-              <div>
-                <span>تعداد روزهای ماه</span>
-                <b>{fa(dates.length)} روز</b>
-              </div>
             </div>
-            {monthShifts.length > 0 && (
-              <Notice warning>
-                برنامهٔ فعلی این ماه جایگزین می‌شود. ماه دارای سابقهٔ حضور، غیبت
-                یا جابه‌جایی، برای حفظ سوابق بازتولید نمی‌شود.
-              </Notice>
-            )}
             <Notice>
-              اگر نیروی کافی برای رعایت فاصلهٔ استراحت نباشد، برنامه با هشدار
-              ساخته می‌شود. عدالت یک هدف بهینه‌سازی است و گزارش آن قابل بررسی
-              است.
+              برنامه‌های موجود خودکار جایگزین نمی‌شوند. برای تغییر فهرست، ابتدا
+              حذف امن و ثبت وضعیت حق شیفت را انجام دهید. حداکثر بازه ۳۶۶ روز
+              است. کمبود نیرو برای استراحت با هشدار مشخص می‌شود.
             </Notice>
             {error && <ErrorText text={error} />}
           </div>
           <div className="modal-footer">
             <button className="button button-primary" onClick={handleGenerate}>
               <WandSparkles size={17} />
-              ساخت برنامهٔ {months[month - 1]}
+              ساخت برنامهٔ انتخاب‌شده
             </button>
             <button className="button button-secondary" onClick={close}>
               انصراف
@@ -2087,7 +2277,12 @@ export default function App() {
         <Modal
           title="ورود پرسنل از اکسل"
           subtitle="فایل را انتخاب کنید، پیش‌نمایش را ببینید و سپس تأیید کنید."
-          onClose={close}
+          onClose={() => {
+            if (importReturn) {
+              setImportReturn(false);
+              open("generate");
+            } else close();
+          }}
           wide
         >
           <div className="modal-body">
@@ -2197,7 +2392,15 @@ export default function App() {
               <Check size={17} />
               تأیید ورود {imported.length > 0 && `${fa(imported.length)} نفر`}
             </button>
-            <button className="button button-secondary" onClick={close}>
+            <button
+              className="button button-secondary"
+              onClick={() => {
+                if (importReturn) {
+                  setImportReturn(false);
+                  open("generate");
+                } else close();
+              }}
+            >
               انصراف
             </button>
           </div>
@@ -2823,6 +3026,7 @@ export default function App() {
           onClose={close}
         >
           <div className="modal-body form-stack">
+            <ReminderPanel data={data} onSave={commit} />
             <Notice>
               برنامه کاملاً محلی است. برای حفظ سوابق، به‌صورت منظم نسخهٔ پشتیبان
               دریافت کنید.
