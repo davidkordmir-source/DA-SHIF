@@ -181,3 +181,12 @@ export function validAppearance(value: unknown): value is Appearance {
     themes.some((t) => t.id === a.theme) && fonts.some((f) => f.id === a.font)
   );
 }
+
+// Appearance is optional metadata, not a reason to reject personnel records.
+export function normalizeAppearance(value: unknown): Appearance {
+  const a = value && typeof value === "object" ? value as Partial<Appearance> : {};
+  return {
+    theme: themes.find((t) => t.id === a.theme)?.id || defaultAppearance.theme,
+    font: fonts.find((f) => f.id === a.font)?.id || defaultAppearance.font,
+  };
+}

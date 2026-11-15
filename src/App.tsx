@@ -78,7 +78,7 @@ import {
   exportSchedule,
   readPeople,
 } from "./lib/excel";
-import { loadData, saveData, validateBackup } from "./lib/storage";
+import { loadData, parseBackup, saveData, storageErrorMessage } from "./lib/storage";
 
 import logo from "../assets/hamshift.svg";
 import { AppearancePanel } from "./AppearancePanel";
@@ -139,6 +139,10 @@ export default function App() {
   }, []);
 
   const [storageError, setStorageError] = useState(loaded.error || "");
+  const [storageNotice, setStorageNotice] = useState(loaded.notice || "");
+  const [needsRecovery, setNeedsRecovery] = useState(loaded.source === "unavailable");
+  const pendingRecovery = useRef(loaded.source === "backup");
+  const initializedStorage = useRef(false);
   const [page, setPage] = useState<Page>("schedule");
   const [dialog, setDialog] = useState<Dialog>(null);
   const [toast, setToast] = useState("");
@@ -255,38 +259,69 @@ export default function App() {
     setError("");
   };
   const commit = (next: AppData, message?: string, recovering = false) => {
-    if (storageError && !recovering) {
+    if (needsRecovery && !recovering) {
       setError(storageError);
-      showToast(
-        "ذخیره‌سازی متوقف است. از بخش تنظیمات نسخهٔ پشتیبان بازیابی کنید.",
-      );
+      showToast("اطلاعات قبلی هنوز قابل خواندن نیستند. دوباره تلاش کنید یا پشتیبان معتبر بازیابی کنید؛ فایل‌ها را حذف نکنید.");
       return false;
     }
     try {
-      saveData(next);
-      setData(next);
-      if (recovering) setStorageError("");
+      const saved = saveData(next, recovering || pendingRecovery.current);
+      setData(saved);
+      setStorageError("");
+      setNeedsRecovery(false);
+      pendingRecovery.current = false;
+      setError("");
       if (message) showToast(message);
       return true;
-    } catch {
-      const msg =
-        "ذخیره‌سازی انجام نشد؛ فضای دستگاه یا دسترسی به حافظه را بررسی و نسخهٔ پشتیبان دریافت کنید.";
+    } catch (e) {
+      const msg = storageErrorMessage(e);
+      setStorageError(msg);
       setError(msg);
       showToast(msg);
       return false;
     }
   };
   useEffect(() => {
-    if (!loaded.error) {
+    if (initializedStorage.current) return;
+    initializedStorage.current = true;
+    // Healthy data need no startup write. In particular, do not replace the
+    // previous backup merely because the user opened the application.
+    if (loaded.needsSave) {
       try {
-        saveData(loaded.data);
-      } catch {
-        setStorageError(
-          "ذخیرهٔ داده‌ها در دستگاه ممکن نیست. فضای آزاد و دسترسی نوشتن را بررسی کنید.",
-        );
+        saveData(loaded.data, pendingRecovery.current);
+        pendingRecovery.current = false;
+      } catch (e) {
+        setStorageError(storageErrorMessage(e));
       }
     }
   }, [loaded]);
+  const retryStorage = () => {
+    if (!needsRecovery) {
+      commit(data, "ذخیره‌سازی دوباره فعال شد.");
+      return;
+    }
+    const result = loadData();
+    if (result.source === "unavailable") {
+      setStorageError(result.error || "خواندن اطلاعات هنوز ممکن نیست.");
+      return;
+    }
+    // Once real data can be read, keep them available even if writing still
+    // needs another retry. Never substitute demo data for an unreadable file.
+    setData(result.data);
+    setSettings(result.data.settings);
+    setNeedsRecovery(false);
+    setStorageNotice(result.notice || "");
+    pendingRecovery.current = result.source === "backup";
+    try {
+      if (result.needsSave) saveData(result.data, pendingRecovery.current);
+      pendingRecovery.current = false;
+      setStorageError("");
+      setError("");
+      showToast("اطلاعات دوباره در دسترس است.");
+    } catch (e) {
+      setStorageError(storageErrorMessage(e));
+    }
+  };
   useEffect(() => {
     if (!toast) return;
     const timer = setTimeout(() => setToast(""), 6000);
@@ -452,6 +487,10 @@ export default function App() {
     }
   };
   const backup = () => {
+    if (needsRecovery) {
+      showToast("اطلاعات قبلی هنوز خوانده نشده‌اند؛ برای جلوگیری از دریافت پشتیبان خالی، ابتدا خواندن دوباره یا بازیابی را انجام دهید.");
+      return;
+    }
     download(
       new Blob([JSON.stringify(data, null, 2)], { type: "application/json" }),
       `hamshift-backup-${today}.json`,
@@ -463,7 +502,7 @@ export default function App() {
     try {
       if (file.size > 10 * 1024 * 1024)
         throw new Error("حداکثر حجم پشتیبان ۱۰ مگابایت است.");
-      const candidate = validateBackup(JSON.parse(await file.text()));
+      const candidate = parseBackup(await file.text());
       setRestoreCandidate(candidate);
     } catch (e) {
       showToast((e as Error).message);
@@ -656,7 +695,7 @@ export default function App() {
               <b>مدیر سیستم</b>
               <small>فضای کاری شخصی</small>
             </div>
-            <span className="version">۲.۲</span>
+            <span className="version">۲.۲.۱</span>
           </div>
         </div>
       </aside>
@@ -820,7 +859,24 @@ export default function App() {
               )}
             </div>
           </div>
-          {storageError && <Notice warning>{storageError}</Notice>}
+          {storageError && (
+            <Notice warning>
+              <div role="alert">
+                <p>{storageError}</p>
+                <div className="backup-actions">
+                  <button className="button button-secondary" onClick={retryStorage}>
+                    تلاش دوباره برای ذخیره‌سازی
+                  </button>
+                  {window.desktop && (
+                    <button className="button button-secondary" onClick={() => window.desktop?.openDataFolder()}>
+                      پوشهٔ اطلاعات
+                    </button>
+                  )}
+                </div>
+              </div>
+            </Notice>
+          )}
+          {storageNotice && <Notice>{storageNotice}</Notice>}
           {data.demo && (
             <div className="demo-banner">
               <span>
@@ -1867,6 +1923,13 @@ export default function App() {
                   حذف فایل‌های داده یا تغییر دستگاه می‌تواند دسترسی به داده‌ها
                   را از بین ببرد. به‌صورت منظم پشتیبان بگیرید و فایل را در محل
                   امن نگه دارید. فایل پشتیبان شامل اطلاعات شخصی پرسنل است.
+                </p>
+                <p className="body-text">
+                  هنگام تغییر اطلاعات، پشتیبان خودکار از وضعیت قبلی نگهداری
+                  می‌شود. اگر فایل اصلی قابل خواندن نباشد، پشتیبان معتبر با
+                  اطلاع شما خودکار بازیابی و فایل اصلی جداگانه حفظ می‌شود.
+                  پشتیبان خودکار ممکن است آخرین تغییرات را نداشته باشد؛
+                  پشتیبان‌های جداگانه را هم نگه دارید.
                 </p>
                 <div className="backup-actions">
                   <button className="button button-primary" onClick={backup}>

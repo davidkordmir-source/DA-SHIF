@@ -52,9 +52,12 @@ function setupIpc() {
   ipcMain.on("data:read", (event) => {
     event.returnValue = validSender(event) ? storage.read() : { ok: false };
   });
-  ipcMain.on("data:write", (event, json) => {
+  ipcMain.on("data:backup", (event) => {
+    event.returnValue = validSender(event) ? storage.readBackup() : { ok: false };
+  });
+  ipcMain.on("data:write", (event, json, recovering) => {
     event.returnValue = validSender(event)
-      ? storage.write(json)
+      ? storage.write(json, recovering === true)
       : { ok: false };
   });
   ipcMain.on("app:ready", (event) => {

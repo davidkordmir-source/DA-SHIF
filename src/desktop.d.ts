@@ -4,7 +4,8 @@ declare global {
     desktop?: {
       platform: string;
       readData: () => { ok: boolean; data?: string | null; error?: string };
-      writeData: (json: string) => { ok: boolean; error?: string };
+      readBackup?: () => { ok: boolean; data?: string | null; error?: string };
+      writeData: (json: string, recovering?: boolean) => { ok: boolean; error?: string };
       ready: () => void;
       branding: () => Promise<{
         custom: boolean;
