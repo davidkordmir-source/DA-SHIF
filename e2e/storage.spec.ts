@@ -11,11 +11,14 @@ const data = {
     { id: "1", name: "کارمند اول", department: "عملیات", active: true, reserveOnly: false },
     { id: "2", name: "کارمند دوم", department: "عملیات", active: true, reserveOnly: false },
   ],
-  shifts: [{ date: "2026-11-15", primary: ["1"], reserve: ["2"], attendance: [] }],
+  shifts: [{ scheduleId: "night-team", date: "2026-11-15", primary: ["1"], reserve: ["2"], attendance: [] }],
+  schedules: [{ id: "night-team", name: "تیم شب", startDate: "2026-11-15", endDate: "2026-11-15", personIds: ["1", "2"], location: "محل خدمت تست" }],
+  locations: ["محل خدمت تست"],
+  reminder: { enabled: true, scheduleId: "night-team", time: "08:00", daysBefore: 1 },
   swaps: [],
   events: [],
   settings: { primaryCount: 1, reserveCount: 1, minRestDays: 1, hijriOffset: 0 },
-  appearance: { theme: "ocean", font: "amiri" },
+  appearance: { theme: "ocean", font: "amiri", fontScale: 115 },
 };
 
 const launch = (directory: string) => electron.launch({
@@ -89,14 +92,18 @@ for (const [name, original] of [
       await page.getByRole("button", { name: "تنظیمات", exact: true }).click();
       await page.getByRole("button", { name: "تم شب آرام", exact: true }).click();
       await page.getByRole("button", { name: "فونت استعداد", exact: true }).click();
+      await page.getByRole("button", { name: "بزرگ‌تر", exact: true }).click();
+      expect(JSON.parse(await fs.readFile(file, "utf8")).appearance.fontScale).toBe(120);
+      await page.getByRole("button", { name: "کوچک‌تر", exact: true }).click();
       const saved = JSON.parse(await fs.readFile(file, "utf8"));
-      expect(saved).toEqual({ ...data, appearance: { theme: "midnight", font: "estedad" } });
+      expect(saved).toEqual({ ...data, appearance: { theme: "midnight", font: "estedad", fontScale: 115 } });
       const backupBeforeRestart = await fs.readFile(file + ".bak", "utf8");
       await application.close();
       application = await launch(directory);
       page = await mainPage(application);
       await expect(page.locator("html")).toHaveAttribute("data-theme", "midnight");
       await expect(page.locator("html")).toHaveAttribute("data-font", "estedad");
+      await expect(page.locator("html")).toHaveCSS("font-size", "14.95px");
       expect(await fs.readFile(file + ".bak", "utf8")).toBe(backupBeforeRestart);
       expect(JSON.parse(await fs.readFile(file, "utf8"))).toEqual(saved);
     } finally {

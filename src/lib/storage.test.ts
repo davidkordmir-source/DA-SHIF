@@ -1,6 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { AppData } from "../types";
 import { loadData, parseBackup, saveData, STORAGE_BACKUP_KEY, STORAGE_KEY, validateBackup } from "./storage";
+import { createSchedule } from "./scheduler";
+import { archiveSchedule } from "./schedules";
 
 function fixture(): AppData {
   return {
@@ -33,6 +35,36 @@ describe("storage recovery", () => {
     const data = fixture();
     const result = validateBackup({ ...data, appearance: { theme: "ocean", font: "old-font" } });
     expect(result).toEqual({ ...data, appearance: { theme: "ocean", font: "vazirmatn" } });
+  });
+
+  it("preserves the 2.3 font size while repairing only an unknown font", () => {
+    const data = fixture();
+    const repaired = validateBackup({ ...data, appearance: { theme: "ocean", font: "old-font", fontScale: 120 } });
+    expect(repaired).toEqual({ ...data, appearance: { theme: "ocean", font: "vazirmatn", fontScale: 120 } });
+  });
+
+  it("round-trips 2.3 named schedules, archived rights, locations, reminders, and font size", () => {
+    let data = createSchedule({ ...fixture(), shifts: [], locations: ["محل خدمت تست"] }, {
+      name: "برنامهٔ بایگانی", start: "2026-11-15", end: "2026-11-15", personIds: ["1", "2"], location: "محل خدمت تست",
+    });
+    data = archiveSchedule(data, data.schedules![0].id, {
+      rights: "preserve", reason: "اتمام برنامه", recordedBy: "مسئول تست", restAcknowledged: true,
+    }, "2026-11-15");
+    data = createSchedule(data, {
+      name: "برنامهٔ جاری", start: "2026-11-20", end: "2026-11-20", personIds: ["1", "2"], location: "محل خدمت تست",
+    });
+    data = {
+      ...data,
+      reminder: { enabled: true, scheduleId: data.schedules![0].id, time: "08:00", daysBefore: 1 },
+      appearance: { theme: "ocean", font: "amiri", fontScale: 120 },
+    };
+    saveData(data);
+    expect(loadData().data).toEqual(data);
+    const resized = { ...data, appearance: { ...data.appearance!, fontScale: 125 } };
+    saveData(resized);
+    expect(loadData().data).toEqual(resized);
+    expect(loadData().data.archives).toHaveLength(1);
+    expect(JSON.parse(stored.get(STORAGE_BACKUP_KEY)!)).toEqual(data);
   });
 
   it("refuses to persist records that would fail validation on the next launch", () => {

@@ -160,6 +160,52 @@ export function AppearancePanel({
           <Type size={18} />
           فونت فارسی<span>{fa(fonts.length)} سبک؛ همراه برنامه و آفلاین</span>
         </h3>
+        <div className="font-size-setting">
+          <label htmlFor="font-scale">
+            اندازهٔ نوشته‌ها: {fa(value.fontScale || 100)}٪
+          </label>
+          <input
+            id="font-scale"
+            type="range"
+            min="85"
+            max="140"
+            step="5"
+            value={value.fontScale || 100}
+            onChange={(e) => onChange({ ...value, fontScale: +e.target.value })}
+          />
+          <div className="row-actions">
+            <button
+              className="button button-secondary"
+              disabled={(value.fontScale || 100) <= 85}
+              onClick={() =>
+                onChange({
+                  ...value,
+                  fontScale: Math.max(85, (value.fontScale || 100) - 5),
+                })
+              }
+            >
+              کوچک‌تر
+            </button>
+            <button
+              className="button button-secondary"
+              onClick={() => onChange({ ...value, fontScale: 100 })}
+            >
+              اندازهٔ پیش‌فرض
+            </button>
+            <button
+              className="button button-secondary"
+              disabled={(value.fontScale || 100) >= 140}
+              onClick={() =>
+                onChange({
+                  ...value,
+                  fontScale: Math.min(140, (value.fontScale || 100) + 5),
+                })
+              }
+            >
+              بزرگ‌تر
+            </button>
+          </div>
+        </div>
         <label className="font-test-input">
           <span>متن دلخواه برای مقایسهٔ فونت‌ها</span>
           <input

@@ -1,4 +1,5 @@
 import type { AppData, Person, Shift, Swap, AttendanceStatus } from "../types";
+import { historyShifts, dateRange, requiredRestDays } from "./schedules";
 import { dayDistance, dayOfWeek, eventsFor, monthDates } from "./calendar";
 
 export const workingIds = (s: Shift) => [
@@ -50,8 +51,14 @@ export function personStats(
 
 // Assign the scarce holiday/weekday slots first. Counts include all saved history.
 // A constrained-first pass gives each person a chance before filling ordinary days.
-export function generateSchedule(data: AppData, year: number, month: number) {
-  const dates = monthDates(year, month);
+export function generateSchedule(
+  data: AppData,
+  year: number,
+  month: number,
+  range?: string[],
+  personIds?: string[],
+) {
+  const dates = range || monthDates(year, month);
   const dateSet = new Set(dates);
   if (
     data.shifts.some((s) => dateSet.has(s.date) && s.attendance.length) ||
@@ -66,8 +73,11 @@ export function generateSchedule(data: AppData, year: number, month: number) {
   const retained = data.shifts.filter((s) => !dateSet.has(s.date));
   // Only earlier dates contribute to fairness. Future plans remain protected
   // by the rest constraints, but cannot distort the historical balance.
-  const history = retained.filter((s) => s.date < dates[0]);
-  const active = data.people.filter((p) => p.active);
+  const archived = historyShifts(data).filter((s) => !data.shifts.includes(s));
+  const history = [...retained, ...archived].filter((s) => s.date < dates[0]);
+  const active = data.people.filter(
+    (p) => p.active && (!personIds || personIds.includes(p.id)),
+  );
   const primaryPool = active.filter((p) => !p.reserveOnly);
   if (primaryPool.length < data.settings.primaryCount)
     throw new Error("تعداد نیروهای فعال اصلی از ظرفیت روزانه کمتر است.");
@@ -81,7 +91,7 @@ export function generateSchedule(data: AppData, year: number, month: number) {
     reserve: [],
     attendance: [],
   }));
-  const all = [...retained, ...shifts];
+  const all = [...retained, ...archived, ...shifts];
   const stats = new Map(
     active.map((p) => {
       const s = personStats(p.id, history, data);
@@ -125,7 +135,7 @@ export function generateSchedule(data: AppData, year: number, month: number) {
           (s) =>
             workingIds(s).includes(p.id) &&
             Math.abs(dayDistance(s.date, shift.date)) <=
-              data.settings.minRestDays,
+              requiredRestDays(data, s),
         );
       const rested = pool.filter((p) => nearby(p).length === 0);
       const candidates = rested.length ? rested : pool;
@@ -198,7 +208,7 @@ export function generateSchedule(data: AppData, year: number, month: number) {
           (s) =>
             workingIds(s).includes(p.id) &&
             Math.abs(dayDistance(s.date, shift.date)) <=
-              data.settings.minRestDays,
+              requiredRestDays(data, s),
         ).length;
         return stats.get(p.id)!.reserve * 100 + nearbyDuty * 10000;
       };
@@ -214,6 +224,56 @@ export function generateSchedule(data: AppData, year: number, month: number) {
       a.date.localeCompare(b.date),
     ),
     warnings,
+  };
+}
+
+export function createSchedule(
+  data: AppData,
+  input: {
+    name: string;
+    start: string;
+    end: string;
+    personIds: string[];
+    location?: string;
+  },
+): AppData {
+  const name = input.name.trim();
+  if (!name || name.length > 100)
+    throw new Error("نام فهرست برنامه را وارد کنید (حداکثر ۱۰۰ حرف).");
+  const dates = dateRange(input.start, input.end);
+  const occupied = new Set(historyShifts(data).map((s) => s.date));
+  if (dates.some((date) => occupied.has(date)))
+    throw new Error(
+      "این بازه برنامه یا حق شیفت محفوظ دارد. ابتدا برنامهٔ اشتباه را با ثبت وضعیت حق افراد حذف کنید؛ روزهای دارای حق محفوظ قابل بازنویسی نیستند.",
+    );
+  const personIds = [...new Set(input.personIds)];
+  if (personIds.some((id) => !data.people.some((p) => p.id === id && p.active)))
+    throw new Error("فهرست اعضا شامل فرد نامعتبر یا غیرفعال است.");
+  if (input.location && !data.locations?.includes(input.location))
+    throw new Error("محل خدمت در فهرست موقعیت‌ها وجود ندارد.");
+  const result = generateSchedule(data, 0, 0, dates, personIds),
+    id = crypto.randomUUID();
+  return {
+    ...data,
+    demo: false,
+    shifts: result.shifts.map((s) =>
+      dates.includes(s.date) ? { ...s, scheduleId: id } : s,
+    ),
+    schedules: [
+      ...(data.schedules || []),
+      {
+        id,
+        name,
+        startDate: input.start,
+        endDate: input.end,
+        personIds,
+        ...(input.location ? { location: input.location } : {}),
+      },
+    ],
+    schedulingWarnings: {
+      ...data.schedulingWarnings,
+      [dates[0]]: result.warnings,
+    },
   };
 }
 
@@ -277,13 +337,13 @@ export function validateSwap(
         ];
   for (const [id, destination, source] of transfers) {
     if (
-      data.shifts.some(
+      historyShifts(data).some(
         (s) =>
           s.date !== source &&
           s.date !== destination &&
           workingIds(s).includes(id) &&
           Math.abs(dayDistance(s.date, destination)) <=
-            data.settings.minRestDays,
+            requiredRestDays(data, s),
       )
     )
       throw new Error(
@@ -343,11 +403,11 @@ export function reserveDutyConflicts(
   date: string,
   personId: string,
 ) {
-  return data.shifts.filter(
+  return historyShifts(data).filter(
     (s) =>
       s.date !== date &&
       workingIds(s).includes(personId) &&
-      Math.abs(dayDistance(s.date, date)) <= data.settings.minRestDays,
+      Math.abs(dayDistance(s.date, date)) <= requiredRestDays(data, s),
   );
 }
 

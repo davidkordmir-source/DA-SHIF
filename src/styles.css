@@ -5,7 +5,7 @@
   background: var(--c-f6f8f9);
   font-synthesis: none;
   font-weight: 400;
-  font-size: 13px;
+  font-size: calc(13px * var(--font-scale, 1));
   --green: var(--c-137c66);
   --green-dark: var(--c-0c6352);
   --muted: var(--c-84928f);
@@ -112,7 +112,7 @@ input[type="radio"] {
   box-shadow: 0 4px 9px var(--c-137c6619);
 }
 .brand b {
-  font-size: 27px;
+  font-size: 2.076923rem;
   letter-spacing: -1.5px;
   line-height: 1.25;
   font-weight: 800;
@@ -123,7 +123,7 @@ input[type="radio"] {
 .brand small {
   display: block;
   color: var(--c-8d9995);
-  font-size: 10px;
+  font-size: 0.769231rem;
   margin-top: 2px;
   letter-spacing: 0;
 }
@@ -146,13 +146,13 @@ input[type="radio"] {
   color: var(--c-617a71);
 }
 .workspace-label strong {
-  font-size: 11px;
+  font-size: 0.846154rem;
   font-weight: 600;
   display: block;
 }
 .workspace-label small {
   display: block;
-  font-size: 10px;
+  font-size: 0.769231rem;
   color: var(--c-97a29e);
   margin-top: 2px;
 }
@@ -165,7 +165,7 @@ input[type="radio"] {
   margin-left: 3px;
 }
 .nav-caption {
-  font-size: 10px;
+  font-size: 0.769231rem;
   color: var(--c-9aa6a0);
   padding: 0 15px;
   margin-bottom: 12px;
@@ -177,7 +177,7 @@ input[type="radio"] {
   width: 100%;
   padding: 13px 14px;
   border-radius: 8px;
-  font-size: 12px;
+  font-size: 0.923077rem;
   color: var(--c-73837d);
   margin-bottom: 5px;
   text-align: right;
@@ -196,7 +196,7 @@ input[type="radio"] {
   font-weight: 650;
 }
 .nav-item small {
-  font-size: 10px;
+  font-size: 0.769231rem;
   background: var(--c-f0f3f1);
   color: var(--c-89958e);
   border-radius: 5px;
@@ -245,11 +245,11 @@ input[type="radio"] {
 }
 .offline-card strong {
   display: block;
-  font-size: 11px;
+  font-size: 0.846154rem;
   font-weight: 650;
 }
 .offline-card p {
-  font-size: 10px;
+  font-size: 0.769231rem;
   color: var(--c-8c9b91);
   line-height: 1.9;
   margin: 7px 0 12px;
@@ -258,7 +258,7 @@ input[type="radio"] {
   display: flex;
   gap: 6px;
   align-items: center;
-  font-size: 9px;
+  font-size: 0.692308rem;
   color: var(--c-5c8e76);
 }
 .offline-card i,
@@ -290,21 +290,21 @@ input[type="radio"] {
   background: var(--c-edf2ed);
   color: var(--c-7f9381);
   border-radius: 50%;
-  font-size: 13px;
+  font-size: 1rem;
   font-weight: 600;
 }
 .sidebar-footer b {
-  font-size: 11px;
+  font-size: 0.846154rem;
   font-weight: 600;
 }
 .sidebar-footer small {
-  font-size: 9px;
+  font-size: 0.692308rem;
   display: block;
   margin-top: 2px;
   color: var(--c-95a29b);
 }
 .version {
-  font-size: 10px;
+  font-size: 0.769231rem;
   color: var(--c-afbab3);
   margin-right: auto;
 }
@@ -326,7 +326,7 @@ input[type="radio"] {
   align-items: center;
   gap: 11px;
   color: var(--c-93a19a);
-  font-size: 11px;
+  font-size: 0.846154rem;
 }
 .breadcrumb b {
   font-weight: 500;
@@ -338,7 +338,7 @@ input[type="radio"] {
   gap: 20px;
 }
 .topbar-date {
-  font-size: 10px;
+  font-size: 0.769231rem;
   color: var(--c-809087);
   display: flex;
   gap: 7px;
@@ -348,7 +348,7 @@ input[type="radio"] {
   display: flex;
   gap: 6px;
   align-items: center;
-  font-size: 9px;
+  font-size: 0.692308rem;
   color: var(--c-658a75);
   border-radius: 20px;
   background: var(--c-f1f7f2);
@@ -374,7 +374,7 @@ input[type="radio"] {
 .top-avatar {
   width: 31px;
   height: 31px;
-  font-size: 12px;
+  font-size: 0.923077rem;
 }
 .mobile-menu {
   display: none !important;
@@ -392,7 +392,7 @@ main {
   margin-bottom: 23px;
 }
 .eyebrow {
-  font-size: 9px;
+  font-size: 0.692308rem;
   display: flex;
   gap: 6px;
   align-items: center;
@@ -407,7 +407,7 @@ main {
   background: var(--c-7caa8c);
 }
 h1 {
-  font-size: 27px;
+  font-size: 2.076923rem;
   font-weight: 750;
   letter-spacing: -1.2px;
   color: var(--c-273e34);
@@ -419,7 +419,7 @@ h1 {
 }
 .page-heading p {
   color: var(--c-8e9a93);
-  font-size: 11px;
+  font-size: 0.846154rem;
   margin-top: 5px;
 }
 .heading-actions {
@@ -435,7 +435,7 @@ h1 {
   gap: 8px;
   white-space: nowrap;
   border-radius: 7px;
-  font-size: 11px;
+  font-size: 0.846154rem;
   font-weight: 550;
   min-height: 39px;
   padding: 9px 15px;
@@ -464,7 +464,7 @@ h1 {
   border-color: var(--c-b6c9bd);
 }
 .button-small {
-  font-size: 10px;
+  font-size: 0.769231rem;
   min-height: 31px;
   padding: 5px 10px;
 }
@@ -483,7 +483,7 @@ h1 {
   color: var(--green);
 }
 .text-button {
-  font-size: 11px;
+  font-size: 0.846154rem;
   font-weight: 500;
   color: var(--green);
   display: inline-flex;
@@ -509,7 +509,7 @@ h1 {
   padding: 9px 13px;
   margin-bottom: 20px;
   color: var(--c-959478);
-  font-size: 10px;
+  font-size: 0.769231rem;
   line-height: 1.8;
 }
 .demo-banner > span {
@@ -527,7 +527,7 @@ h1 {
 }
 .demo-banner button {
   white-space: nowrap;
-  font-size: 10px;
+  font-size: 0.769231rem;
   color: var(--c-7b8563);
   display: flex;
   align-items: center;
@@ -553,7 +553,7 @@ h1 {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  font-size: 11px;
+  font-size: 0.846154rem;
   color: var(--c-8b9991);
 }
 .stat-icon {
@@ -577,7 +577,7 @@ h1 {
   background: var(--c-fbf6eb);
 }
 .stat-value {
-  font-size: 29px;
+  font-size: 2.230769rem;
   line-height: 1.4;
   font-weight: 700;
   margin: 4px 0 9px;
@@ -587,14 +587,14 @@ h1 {
 .stat-value small {
   font-weight: 400;
   color: var(--c-8a988f);
-  font-size: 10px;
+  font-size: 0.769231rem;
   letter-spacing: 0;
   margin-right: 4px;
 }
 .stat-foot {
   border-top: 1px solid var(--c-f0f3f0);
   padding-top: 10px;
-  font-size: 9px;
+  font-size: 0.692308rem;
   color: var(--c-96a298);
   display: flex;
   align-items: center;
@@ -656,13 +656,13 @@ h1 {
   display: flex;
 }
 h2 {
-  font-size: 14px;
+  font-size: 1.076923rem;
   font-weight: 650;
   letter-spacing: -0.2px;
 }
 .badge {
   border-radius: 5px;
-  font-size: 9px;
+  font-size: 0.692308rem;
   line-height: 1.8;
   padding: 3px 7px;
   white-space: nowrap;
@@ -698,7 +698,7 @@ h2 {
 }
 .export-button {
   color: var(--c-8c9a90);
-  font-size: 9px;
+  font-size: 0.692308rem;
 }
 .view-switch {
   display: flex;
@@ -734,7 +734,7 @@ h2 {
   gap: 3px;
 }
 .month-navigation strong {
-  font-size: 16px;
+  font-size: 1.230769rem;
   font-weight: 650;
   min-width: 98px;
   text-align: center;
@@ -753,7 +753,7 @@ h2 {
   margin-right: 7px;
   border: 1px solid var(--c-e7ece5);
   border-radius: 5px;
-  font-size: 9px;
+  font-size: 0.692308rem;
   color: var(--c-86957e);
   padding: 4px 9px;
   line-height: 1.5;
@@ -764,7 +764,7 @@ h2 {
   color: var(--green);
 }
 .alternate-range {
-  font-size: 9px;
+  font-size: 0.692308rem;
   color: var(--c-a3ada2);
   margin-right: 26px;
   margin-top: 7px;
@@ -788,7 +788,7 @@ h2 {
   background: var(--c-fff);
   color: var(--c-7d8f7d);
   padding: 7px 10px 7px 28px;
-  font-size: 10px;
+  font-size: 0.769231rem;
   min-height: 32px;
   cursor: pointer;
   max-width: 100%;
@@ -812,7 +812,7 @@ h2 {
 }
 .weekday-row > div {
   text-align: center;
-  font-size: 10px;
+  font-size: 0.769231rem;
   padding: 11px 2px;
   color: var(--c-889586);
 }
@@ -865,7 +865,7 @@ h2 {
   height: 22px;
 }
 .day-number {
-  font-size: 12px;
+  font-size: 0.923077rem;
   font-weight: 550;
   color: var(--c-758570);
   display: grid;
@@ -880,10 +880,10 @@ h2 {
   background: var(--c-18806a);
   color: white;
   border-radius: 50%;
-  font-size: 11px;
+  font-size: 0.846154rem;
 }
 .today-label {
-  font-size: 8px;
+  font-size: 0.615385rem;
   color: var(--c-72a085);
 }
 .event-dot {
@@ -909,7 +909,7 @@ h2 {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  font-size: 9px;
+  font-size: 0.692308rem;
   line-height: 1.65;
   color: var(--c-6a947c);
   background: var(--c-eef6ef);
@@ -932,7 +932,7 @@ h2 {
   background: var(--c-9db6ca);
 }
 .reserve-count {
-  font-size: 8px;
+  font-size: 0.615385rem;
   display: flex;
   gap: 4px;
   align-items: center;
@@ -947,7 +947,7 @@ h2 {
   background: var(--c-b6c1b0);
 }
 .cell-event {
-  font-size: 7px;
+  font-size: 0.538462rem;
   color: var(--c-bb9a88);
   white-space: nowrap;
   text-overflow: ellipsis;
@@ -968,11 +968,11 @@ h2 {
 }
 .outside-number {
   color: var(--c-cbd2c5);
-  font-size: 12px;
+  font-size: 0.923077rem;
   padding: 3px 4px;
 }
 .no-shift {
-  font-size: 8px;
+  font-size: 0.615385rem;
   color: var(--c-b9c0b4);
   margin-top: auto;
   margin-bottom: 10px;
@@ -984,7 +984,7 @@ h2 {
   justify-content: space-between;
   gap: 10px;
   border-top: 1px solid var(--c-edf0e9);
-  font-size: 8px;
+  font-size: 0.615385rem;
   color: var(--c-a0ad9c);
 }
 .calendar-footer > div {
@@ -1048,18 +1048,18 @@ h2 {
   border: 1px solid var(--c-e8eee6);
 }
 .balance-heading .badge {
-  font-size: 8px;
+  font-size: 0.615385rem;
   color: var(--c-7b9f80);
   background: var(--c-e2efe2);
 }
 .balance-card h3 {
-  font-size: 15px;
+  font-size: 1.153846rem;
   color: var(--c-3c6448);
   font-weight: 650;
   letter-spacing: -0.5px;
 }
 .balance-card > p {
-  font-size: 10px;
+  font-size: 0.769231rem;
   line-height: 2.05;
   color: var(--c-86a087);
   margin-top: 9px;
@@ -1081,7 +1081,7 @@ h2 {
 .balance-meter-label {
   display: flex;
   justify-content: space-between;
-  font-size: 8px;
+  font-size: 0.615385rem;
   color: var(--c-9aaa8d);
   margin-top: 8px;
 }
@@ -1096,7 +1096,7 @@ h2 {
   width: 100%;
   justify-content: space-between;
   color: var(--c-67916e);
-  font-size: 9px;
+  font-size: 0.692308rem;
 }
 .occasions-panel {
   padding: 17px 16px 12px;
@@ -1111,7 +1111,7 @@ h2 {
   display: flex;
   gap: 7px;
   align-items: center;
-  font-size: 11px;
+  font-size: 0.846154rem;
   color: var(--c-6e806b);
   font-weight: 550;
 }
@@ -1123,7 +1123,7 @@ h2 {
   background: var(--c-f5f7f1);
   min-width: 19px;
   text-align: center;
-  font-size: 9px;
+  font-size: 0.692308rem;
   border-radius: 4px;
 }
 .occasion {
@@ -1152,13 +1152,13 @@ h2 {
   gap: 0;
 }
 .occasion-date b {
-  font-size: 14px;
+  font-size: 1.076923rem;
   color: var(--c-829474);
   font-weight: 550;
   line-height: 1.3;
 }
 .occasion-date small {
-  font-size: 7px;
+  font-size: 0.538462rem;
   color: var(--c-a0ad93);
 }
 .occasion-holiday {
@@ -1178,12 +1178,12 @@ h2 {
   display: block;
   font-weight: 450;
   color: var(--c-7a8c70);
-  font-size: 9px;
+  font-size: 0.692308rem;
   line-height: 1.9;
 }
 .occasion > span > small {
   display: block;
-  font-size: 8px;
+  font-size: 0.615385rem;
   color: var(--c-b0b9a6);
   margin-top: 3px;
 }
@@ -1194,10 +1194,10 @@ h2 {
   width: 100%;
   margin-top: 14px;
   color: var(--c-8caa7b);
-  font-size: 9px;
+  font-size: 0.692308rem;
 }
 .lunar-note {
-  font-size: 8px;
+  font-size: 0.615385rem;
   line-height: 1.9;
   color: var(--c-a7b29f);
   margin-top: 13px;
@@ -1205,7 +1205,7 @@ h2 {
   border-top: 1px dashed var(--c-e8eddf);
 }
 .aside-empty {
-  font-size: 11px;
+  font-size: 0.846154rem;
   color: var(--c-8c9b8c);
   padding: 22px 15px;
   line-height: 1.9;
@@ -1221,17 +1221,17 @@ h2 {
   margin-top: 3px;
 }
 .backup-card strong {
-  font-size: 10px;
+  font-size: 0.769231rem;
   color: var(--c-7e9173);
   font-weight: 550;
 }
 .backup-card p {
-  font-size: 8px;
+  font-size: 0.615385rem;
   color: var(--c-afbaa5);
   margin: 5px 0 10px;
 }
 .backup-card button {
-  font-size: 9px;
+  font-size: 0.692308rem;
   display: flex;
   align-items: center;
   gap: 7px;
@@ -1241,7 +1241,7 @@ h2 {
   margin-top: 23px;
   display: flex;
   justify-content: space-between;
-  font-size: 8px;
+  font-size: 0.615385rem;
   color: var(--c-a7b1a3);
   padding: 2px 2px 8px;
   gap: 10px;
@@ -1255,7 +1255,7 @@ h2 {
   color: var(--c-a0b298);
 }
 .tiny-heart {
-  font-size: 17px;
+  font-size: 1.307692rem;
   color: var(--c-abbba2);
   margin-right: 3px;
 }
@@ -1273,7 +1273,7 @@ h2 {
   gap: 9px;
 }
 .section-toolbar p {
-  font-size: 11px;
+  font-size: 0.846154rem;
   color: var(--c-91a093);
   margin-top: 7px;
 }
@@ -1294,7 +1294,7 @@ h2 {
   min-width: 0;
   outline: none;
   box-shadow: none;
-  font-size: 11px;
+  font-size: 0.846154rem;
   color: var(--c-5e7561);
 }
 .search-input input::placeholder {
@@ -1313,12 +1313,12 @@ table {
   width: 100%;
   text-align: right;
   white-space: nowrap;
-  font-size: 11px;
+  font-size: 0.846154rem;
 }
 th {
   background: var(--c-fafbf9);
   color: var(--c-92a18c);
-  font-size: 10px;
+  font-size: 0.769231rem;
   font-weight: 450;
   padding: 14px 20px;
   border-bottom: 1px solid var(--border);
@@ -1341,7 +1341,7 @@ tbody tr:hover {
   align-items: center;
   text-align: right;
   padding: 0;
-  font-size: 11px;
+  font-size: 0.846154rem;
   min-width: 0;
 }
 .person-cell strong {
@@ -1350,7 +1350,7 @@ tbody tr:hover {
 }
 .person-cell small {
   display: block;
-  font-size: 9px;
+  font-size: 0.692308rem;
   color: var(--c-a9b4a1);
   margin-top: 2px;
 }
@@ -1360,7 +1360,7 @@ tbody tr:hover {
   width: 35px;
   height: 35px;
   border-radius: 11px;
-  font-size: 11px;
+  font-size: 0.846154rem;
   font-weight: 600;
   flex-shrink: 0;
   background: var(--c-eef4e8);
@@ -1396,7 +1396,7 @@ tbody tr:hover {
   width: 29px;
   height: 29px;
   border-radius: 9px;
-  font-size: 9px;
+  font-size: 0.692308rem;
 }
 .block {
   display: block;
@@ -1424,12 +1424,12 @@ tbody tr:hover {
   margin-bottom: 19px;
 }
 .empty h3 {
-  font-size: 16px;
+  font-size: 1.230769rem;
   color: var(--c-65815d);
   font-weight: 550;
 }
 .empty p {
-  font-size: 11px;
+  font-size: 0.846154rem;
   color: var(--c-9cab91);
   max-width: 420px;
   line-height: 2;
@@ -1445,7 +1445,7 @@ tbody tr:hover {
   color: var(--c-8b9f7b);
   border: 1px solid var(--c-e4eddd);
   border-radius: 7px;
-  font-size: 10px;
+  font-size: 0.769231rem;
   line-height: 2;
   margin-bottom: 16px;
 }
@@ -1490,18 +1490,18 @@ tbody tr:hover {
   display: flex;
   align-items: center;
   gap: 10px;
-  font-size: 14px;
+  font-size: 1.076923rem;
   font-weight: 550;
   color: var(--c-6e8962);
 }
 .swap-record p {
-  font-size: 11px;
+  font-size: 0.846154rem;
   color: var(--c-93a085);
   margin-top: 7px;
   line-height: 1.9;
 }
 .swap-record small {
-  font-size: 9px;
+  font-size: 0.692308rem;
   color: var(--c-b1baa7);
   display: block;
   margin-top: 8px;
@@ -1573,7 +1573,7 @@ tbody tr:hover {
 }
 .settings-title p {
   color: var(--c-a0ad94);
-  font-size: 10px;
+  font-size: 0.769231rem;
   line-height: 1.9;
   margin-top: 7px;
 }
@@ -1590,7 +1590,7 @@ tbody tr:hover {
   min-width: 0;
 }
 .field > span:first-child {
-  font-size: 11px;
+  font-size: 0.846154rem;
   color: var(--c-829575);
   font-weight: 500;
 }
@@ -1603,7 +1603,7 @@ tbody tr:hover {
   padding: 9px 12px;
   color: var(--c-69805e);
   background: var(--c-fff);
-  font-size: 12px;
+  font-size: 0.923077rem;
   resize: vertical;
 }
 .field input::placeholder,
@@ -1616,19 +1616,19 @@ tbody tr:hover {
 }
 .field select {
   width: 100%;
-  font-size: 11px;
+  font-size: 0.846154rem;
   color: var(--c-718568);
   min-height: 40px;
   border-color: var(--c-e4eadc);
 }
 .field small {
   color: var(--c-a9b49a);
-  font-size: 9px;
+  font-size: 0.692308rem;
   line-height: 1.9;
 }
 .body-text {
   color: var(--c-9bab8f);
-  font-size: 11px;
+  font-size: 0.846154rem;
   line-height: 2.3;
 }
 .backup-actions {
@@ -1651,12 +1651,12 @@ tbody tr:hover {
   color: var(--c-a3bc8d);
 }
 .privacy-box b {
-  font-size: 11px;
+  font-size: 0.846154rem;
   color: var(--c-829b6e);
   font-weight: 550;
 }
 .privacy-box p {
-  font-size: 9px;
+  font-size: 0.692308rem;
   color: var(--c-a6b697);
   line-height: 2;
   margin-top: 4px;
@@ -1723,12 +1723,12 @@ tbody tr:hover {
   flex-shrink: 0;
 }
 .modal-header h2 {
-  font-size: 18px;
+  font-size: 1.384615rem;
   color: var(--c-54794f);
   letter-spacing: -0.6px;
 }
 .modal-header p {
-  font-size: 10px;
+  font-size: 0.769231rem;
   color: var(--c-9caf8e);
   margin-top: 7px;
   line-height: 1.9;
@@ -1783,16 +1783,16 @@ tbody tr:hover {
   position: absolute;
   top: 0;
   right: 0;
-  font-size: 19px;
+  font-size: 1.461538rem;
   color: var(--c-b4c99b);
 }
 .generation-visual h3 {
-  font-size: 17px;
+  font-size: 1.307692rem;
   font-weight: 600;
   color: var(--c-71945b);
 }
 .generation-visual p {
-  font-size: 11px;
+  font-size: 0.846154rem;
   line-height: 2;
   color: var(--c-a4b18d);
   margin-top: 10px;
@@ -1820,11 +1820,11 @@ tbody tr:hover {
   border-left: 1px solid var(--c-edf0e5);
 }
 .generation-facts span {
-  font-size: 9px;
+  font-size: 0.692308rem;
   color: var(--c-9bad8b);
 }
 .generation-facts b {
-  font-size: 12px;
+  font-size: 0.923077rem;
   font-weight: 550;
   color: var(--c-829a6a);
 }
@@ -1836,7 +1836,7 @@ tbody tr:hover {
   color: var(--c-bf8671);
   background: var(--c-fff5f0);
   border: 1px solid var(--c-f5dfd1);
-  font-size: 11px;
+  font-size: 0.846154rem;
   line-height: 2;
   border-radius: 7px;
   margin: 10px 0;
@@ -1873,17 +1873,17 @@ tbody tr:hover {
   margin-bottom: 16px;
 }
 .upload-zone strong {
-  font-size: 14px;
+  font-size: 1.076923rem;
   font-weight: 550;
   color: var(--c-7c9c61);
 }
 .upload-zone p {
-  font-size: 11px;
+  font-size: 0.846154rem;
   color: var(--c-a4b78e);
   margin-top: 8px;
 }
 .upload-zone small {
-  font-size: 9px;
+  font-size: 0.692308rem;
   color: var(--c-b6c1a7);
   margin-top: 14px;
 }
@@ -1893,11 +1893,11 @@ tbody tr:hover {
   gap: 10px;
   margin: 18px 0 23px;
   align-items: center;
-  font-size: 10px;
+  font-size: 0.769231rem;
   color: var(--c-a5b295);
 }
 .template-row .text-button {
-  font-size: 10px;
+  font-size: 0.769231rem;
   color: var(--c-8da875);
 }
 .import-errors {
@@ -1906,14 +1906,14 @@ tbody tr:hover {
   border-radius: 7px;
   padding: 13px;
   color: var(--c-bc9a6d);
-  font-size: 11px;
+  font-size: 0.846154rem;
   line-height: 2;
 }
 .import-errors b {
   font-weight: 550;
 }
 .import-errors p {
-  font-size: 10px;
+  font-size: 0.769231rem;
   margin-top: 4px;
 }
 .preview-title {
@@ -1923,7 +1923,7 @@ tbody tr:hover {
   margin: 25px 0 13px;
 }
 .preview-title b {
-  font-size: 12px;
+  font-size: 0.923077rem;
   color: var(--c-829c6c);
   font-weight: 550;
 }
@@ -1940,7 +1940,7 @@ tbody tr:hover {
   display: flex;
   align-items: center;
   gap: 8px;
-  font-size: 11px;
+  font-size: 0.846154rem;
   color: var(--c-97aa83);
   line-height: 2;
   margin: 3px 0 15px;
@@ -1974,7 +1974,7 @@ tbody tr:hover {
   place-items: center;
   background: var(--c-edf4e3);
   color: var(--c-9bb97a);
-  font-size: 12px;
+  font-size: 0.923077rem;
   flex-shrink: 0;
 }
 .swap-connector {
@@ -2004,7 +2004,7 @@ tbody tr:hover {
   color: var(--c-a7b78f);
   cursor: pointer;
   position: relative;
-  font-size: 11px;
+  font-size: 0.846154rem;
 }
 .attendance-option input {
   position: absolute;
@@ -2039,19 +2039,19 @@ tbody tr:hover {
   border: 0;
 }
 .three-dates small {
-  font-size: 9px;
+  font-size: 0.692308rem;
   color: var(--c-b0bd9c);
 }
 .three-dates b {
   font-weight: 500;
-  font-size: 11px;
+  font-size: 0.846154rem;
   color: var(--c-92a67a);
 }
 .small-title {
   display: flex;
   align-items: center;
   gap: 8px;
-  font-size: 12px;
+  font-size: 0.923077rem;
   font-weight: 550;
   color: var(--c-8aa171);
   margin: 22px 0 13px;
@@ -2074,7 +2074,7 @@ tbody tr:hover {
   display: flex;
   align-items: center;
   gap: 6px;
-  font-size: 9px;
+  font-size: 0.692308rem;
   color: var(--c-a5b88d);
   width: 100%;
   padding-right: 44px;
@@ -2083,7 +2083,7 @@ tbody tr:hover {
   display: flex;
   align-items: center;
   gap: 8px;
-  font-size: 11px;
+  font-size: 0.846154rem;
   color: var(--c-b29f78);
   padding: 12px 0;
   border-bottom: 1px solid var(--c-f2f1e4);
@@ -2091,7 +2091,7 @@ tbody tr:hover {
 .day-event small {
   margin-right: auto;
   color: var(--c-b6b999);
-  font-size: 9px;
+  font-size: 0.692308rem;
 }
 .profile-hero {
   display: flex;
@@ -2103,15 +2103,15 @@ tbody tr:hover {
   height: 55px;
   width: 55px;
   border-radius: 15px;
-  font-size: 17px;
+  font-size: 1.307692rem;
 }
 .profile-hero h3 {
-  font-size: 19px;
+  font-size: 1.461538rem;
   font-weight: 600;
   color: var(--c-7e9b64);
 }
 .profile-hero p {
-  font-size: 10px;
+  font-size: 0.769231rem;
   color: var(--c-a7b595);
   margin-top: 6px;
 }
@@ -2138,12 +2138,12 @@ tbody tr:hover {
   border: 0;
 }
 .profile-stats b {
-  font-size: 25px;
+  font-size: 1.923077rem;
   color: var(--c-8daa6e);
   font-weight: 600;
 }
 .profile-stats span {
-  font-size: 9px;
+  font-size: 0.692308rem;
   color: var(--c-a7b68e);
 }
 .next-shift {
@@ -2159,17 +2159,17 @@ tbody tr:hover {
   color: var(--c-9abb7e);
 }
 .next-shift strong {
-  font-size: 10px;
+  font-size: 0.769231rem;
   color: var(--c-a4b88c);
   font-weight: 500;
 }
 .next-shift p {
-  font-size: 12px;
+  font-size: 0.923077rem;
   color: var(--c-8da970);
   margin-top: 5px;
 }
 .next-shift > b {
-  font-size: 12px;
+  font-size: 0.923077rem;
   color: var(--c-89a76c);
   margin-right: auto;
   font-weight: 550;
@@ -2182,7 +2182,7 @@ tbody tr:hover {
 .profile-history td,
 .profile-history th {
   padding: 11px 12px;
-  font-size: 10px;
+  font-size: 0.769231rem;
 }
 .help-hero {
   text-align: center;
@@ -2196,12 +2196,12 @@ tbody tr:hover {
   color: var(--c-98b577);
 }
 .help-hero strong {
-  font-size: 19px;
+  font-size: 1.461538rem;
   font-weight: 650;
   margin-top: 15px;
 }
 .help-hero p {
-  font-size: 10px;
+  font-size: 0.769231rem;
   margin-top: 9px;
   color: var(--c-acbc97);
 }
@@ -2219,17 +2219,17 @@ tbody tr:hover {
   background: var(--c-f6faef);
   border-radius: 8px;
   color: var(--c-a7be8b);
-  font-size: 12px;
+  font-size: 0.923077rem;
   flex-shrink: 0;
 }
 .help-step h3 {
-  font-size: 13px;
+  font-size: 1rem;
   font-weight: 550;
   color: var(--c-8da572);
   margin: 2px 0 7px;
 }
 .help-step p {
-  font-size: 11px;
+  font-size: 0.846154rem;
   line-height: 2.1;
   color: var(--c-aaba95);
 }
@@ -2237,7 +2237,7 @@ tbody tr:hover {
   display: flex;
   align-items: center;
   gap: 10px;
-  font-size: 11px;
+  font-size: 0.846154rem;
   color: var(--c-9bb481);
   padding: 10px 0 25px;
 }
@@ -2256,7 +2256,7 @@ tbody tr:hover {
   display: flex;
   align-items: center;
   gap: 12px;
-  font-size: 11px;
+  font-size: 0.846154rem;
   color: var(--c-81a061);
   line-height: 1.9;
   animation: modal-in 0.15s ease-out;
@@ -2295,10 +2295,10 @@ tbody tr:hover {
     min-height: 148px;
   }
   .shift-chip {
-    font-size: 10px;
+    font-size: 0.769231rem;
   }
   .reserve-count {
-    font-size: 9px;
+    font-size: 0.692308rem;
   }
   .stat-card {
     padding: 19px 23px 15px;
@@ -2358,11 +2358,11 @@ tbody tr:hover {
     gap: 7px;
   }
   .heading-actions .button {
-    font-size: 10px;
+    font-size: 0.769231rem;
     padding: 9px 11px;
   }
   .demo-banner > span > span {
-    font-size: 9px;
+    font-size: 0.692308rem;
   }
   .day-cell {
     min-height: 135px;
@@ -2396,13 +2396,13 @@ tbody tr:hover {
     gap: 9px;
   }
   .brand b {
-    font-size: 25px;
+    font-size: 1.923077rem;
   }
   .brand small {
-    font-size: 9px;
+    font-size: 0.692308rem;
   }
   .nav-item {
-    font-size: 11px;
+    font-size: 0.846154rem;
     padding: 12px 10px;
     gap: 10px;
   }
@@ -2414,10 +2414,10 @@ tbody tr:hover {
     gap: 15px;
   }
   .page-heading h1 {
-    font-size: 24px;
+    font-size: 1.846154rem;
   }
   .page-heading p {
-    font-size: 10px;
+    font-size: 0.769231rem;
   }
   .heading-actions {
     flex-direction: column;
@@ -2425,7 +2425,7 @@ tbody tr:hover {
     margin-top: 5px;
   }
   .heading-actions .button {
-    font-size: 9px;
+    font-size: 0.692308rem;
     min-height: 33px;
     padding: 7px 10px;
   }
@@ -2442,7 +2442,7 @@ tbody tr:hover {
     margin-right: 23px;
   }
   .stat-top {
-    font-size: 10px;
+    font-size: 0.769231rem;
   }
   .stat-icon {
     width: 29px;
@@ -2453,10 +2453,10 @@ tbody tr:hover {
     height: 17px;
   }
   .stat-value {
-    font-size: 25px;
+    font-size: 1.923077rem;
   }
   .stat-foot {
-    font-size: 8px;
+    font-size: 0.615385rem;
   }
   .stats-grid {
     gap: 9px;
@@ -2471,7 +2471,7 @@ tbody tr:hover {
     gap: 5px;
   }
   .calendar-filters select {
-    font-size: 9px;
+    font-size: 0.692308rem;
     padding-right: 8px;
     min-height: 29px;
   }
@@ -2480,7 +2480,7 @@ tbody tr:hover {
     padding-right: 15px;
   }
   .month-navigation strong {
-    font-size: 14px;
+    font-size: 1.076923rem;
     min-width: 83px;
   }
   .day-cell {
@@ -2488,12 +2488,12 @@ tbody tr:hover {
     min-height: 127px;
   }
   .shift-chip {
-    font-size: 8px;
+    font-size: 0.615385rem;
     padding: 2px 4px;
     gap: 4px;
   }
   .calendar-footer {
-    font-size: 7px;
+    font-size: 0.538462rem;
   }
   .calendar-footer > div {
     gap: 8px;
@@ -2512,7 +2512,7 @@ tbody tr:hover {
     min-width: 200px;
   }
   .profile-stats span {
-    font-size: 8px;
+    font-size: 0.615385rem;
   }
 }
 @media (max-width: 760px) {
@@ -2550,7 +2550,7 @@ tbody tr:hover {
   }
   .breadcrumb {
     gap: 8px;
-    font-size: 10px;
+    font-size: 0.769231rem;
   }
   .breadcrumb > svg:first-of-type {
     display: none;
@@ -2559,7 +2559,7 @@ tbody tr:hover {
     gap: 11px;
   }
   .local-status {
-    font-size: 8px;
+    font-size: 0.615385rem;
     padding: 5px 8px;
   }
   .notification-button {
@@ -2581,37 +2581,37 @@ tbody tr:hover {
     margin-bottom: 20px;
   }
   .page-heading h1 {
-    font-size: 24px;
+    font-size: 1.846154rem;
   }
   .page-heading p {
     max-width: 230px;
     line-height: 1.9;
-    font-size: 9px;
+    font-size: 0.692308rem;
   }
   .eyebrow {
-    font-size: 8px;
+    font-size: 0.615385rem;
     gap: 5px;
   }
   .heading-actions {
     gap: 7px;
   }
   .heading-actions .button {
-    font-size: 9px;
+    font-size: 0.692308rem;
     min-height: 34px;
     padding: 7px 9px;
   }
   .heading-actions .button-primary {
-    font-size: 9px;
+    font-size: 0.692308rem;
   }
   .demo-banner {
     padding: 10px;
-    font-size: 9px;
+    font-size: 0.692308rem;
   }
   .demo-banner > span > span {
-    font-size: 8px;
+    font-size: 0.615385rem;
   }
   .demo-banner button {
-    font-size: 8px;
+    font-size: 0.615385rem;
     gap: 4px;
   }
   .demo-banner svg {
@@ -2626,13 +2626,13 @@ tbody tr:hover {
     padding: 12px 15px;
   }
   .stat-top {
-    font-size: 10px;
+    font-size: 0.769231rem;
   }
   .stat-foot {
-    font-size: 8px;
+    font-size: 0.615385rem;
   }
   .stat-value {
-    font-size: 27px;
+    font-size: 2.076923rem;
   }
   .schedule-layout {
     gap: 16px;
@@ -2650,7 +2650,7 @@ tbody tr:hover {
     min-height: 26px;
     padding-top: 4px;
     padding-bottom: 4px;
-    font-size: 8px;
+    font-size: 0.615385rem;
   }
   .calendar-top {
     padding: 17px 12px 13px;
@@ -2659,7 +2659,7 @@ tbody tr:hover {
     gap: 6px;
   }
   .calendar-title h2 {
-    font-size: 12px;
+    font-size: 0.923077rem;
   }
   .panel-icon svg {
     width: 17px;
@@ -2672,23 +2672,23 @@ tbody tr:hover {
     height: 22px;
   }
   .export-button {
-    font-size: 8px;
+    font-size: 0.615385rem;
     gap: 4px;
   }
   .export-button svg {
     width: 13px;
   }
   .month-navigation strong {
-    font-size: 15px;
+    font-size: 1.153846rem;
     min-width: 85px;
   }
   .today-button {
-    font-size: 8px;
+    font-size: 0.615385rem;
     margin-right: 4px;
     padding: 4px 7px;
   }
   .alternate-range {
-    font-size: 8px;
+    font-size: 0.615385rem;
     margin-right: 8px;
     margin-top: 9px;
   }
@@ -2703,10 +2703,10 @@ tbody tr:hover {
     padding: 8px 7px;
   }
   .shift-chip {
-    font-size: 8px;
+    font-size: 0.615385rem;
   }
   .weekday-row > div {
-    font-size: 9px;
+    font-size: 0.692308rem;
   }
   .calendar-footer {
     flex-direction: column;
@@ -2716,10 +2716,10 @@ tbody tr:hover {
   }
   .calendar-footer > div {
     gap: 17px;
-    font-size: 8px;
+    font-size: 0.615385rem;
   }
   .calendar-footer > span {
-    font-size: 8px;
+    font-size: 0.615385rem;
   }
   .schedule-aside {
     grid-template-columns: 1fr 1fr;
@@ -2732,7 +2732,7 @@ tbody tr:hover {
     margin-bottom: 14px;
   }
   .balance-heading .badge {
-    font-size: 7px;
+    font-size: 0.538462rem;
     padding: 3px 4px;
   }
   .balance-heading > span:first-child {
@@ -2743,16 +2743,16 @@ tbody tr:hover {
     width: 18px;
   }
   .balance-card h3 {
-    font-size: 13px;
+    font-size: 1rem;
   }
   .balance-card > p {
-    font-size: 9px;
+    font-size: 0.692308rem;
   }
   .balance-meter-label {
-    font-size: 7px;
+    font-size: 0.538462rem;
   }
   .balance-card > .text-button {
-    font-size: 8px;
+    font-size: 0.615385rem;
     margin-top: 17px;
   }
   .occasions-panel {
@@ -2762,7 +2762,7 @@ tbody tr:hover {
     margin-bottom: 6px;
   }
   .aside-title h3 {
-    font-size: 9px;
+    font-size: 0.692308rem;
     gap: 5px;
   }
   .aside-title h3 svg {
@@ -2773,10 +2773,10 @@ tbody tr:hover {
     padding: 10px 0;
   }
   .occasion strong {
-    font-size: 8px;
+    font-size: 0.615385rem;
   }
   .occasion > span > small {
-    font-size: 7px;
+    font-size: 0.538462rem;
   }
   .occasion-date {
     width: 28px;
@@ -2784,32 +2784,32 @@ tbody tr:hover {
     height: 36px;
   }
   .occasion-date b {
-    font-size: 13px;
+    font-size: 1rem;
   }
   .occasion-date small {
-    font-size: 6px;
+    font-size: 0.461538rem;
   }
   .aside-more {
-    font-size: 8px;
+    font-size: 0.615385rem;
     margin-top: 10px;
   }
   .lunar-note {
-    font-size: 7px;
+    font-size: 0.538462rem;
     margin-top: 10px;
     padding-top: 9px;
   }
   .bottom-note {
-    font-size: 7px;
+    font-size: 0.538462rem;
     line-height: 1.9;
   }
   .bottom-note svg {
     width: 13px;
   }
   .section-toolbar h2 {
-    font-size: 12px;
+    font-size: 0.923077rem;
   }
   .section-toolbar p {
-    font-size: 9px;
+    font-size: 0.692308rem;
     line-height: 1.9;
   }
   .search-input {
@@ -2836,10 +2836,10 @@ tbody tr:hover {
     padding: 20px;
   }
   .modal-header h2 {
-    font-size: 16px;
+    font-size: 1.230769rem;
   }
   .modal-header p {
-    font-size: 9px;
+    font-size: 0.692308rem;
   }
   .modal-body {
     padding: 20px;
@@ -2848,24 +2848,24 @@ tbody tr:hover {
     padding: 16px 20px;
   }
   .modal-footer .button {
-    font-size: 10px;
+    font-size: 0.769231rem;
     padding: 8px 11px;
   }
   .form-grid {
     gap: 13px;
   }
   .field > span:first-child {
-    font-size: 10px;
+    font-size: 0.769231rem;
   }
   .field input,
   .field textarea {
-    font-size: 11px;
+    font-size: 0.846154rem;
   }
   .field small {
-    font-size: 8px;
+    font-size: 0.615385rem;
   }
   .notice {
-    font-size: 9px;
+    font-size: 0.692308rem;
     padding: 10px 11px;
     gap: 7px;
   }
@@ -2876,33 +2876,33 @@ tbody tr:hover {
     padding: 13px 12px;
   }
   .generation-facts span {
-    font-size: 8px;
+    font-size: 0.615385rem;
   }
   .generation-facts b {
-    font-size: 11px;
+    font-size: 0.846154rem;
   }
   .generation-visual {
     padding: 7px 5px 18px;
   }
   .generation-visual h3 {
-    font-size: 15px;
+    font-size: 1.153846rem;
   }
   .generation-visual p {
-    font-size: 10px;
+    font-size: 0.769231rem;
   }
   .upload-zone strong {
-    font-size: 12px;
+    font-size: 0.923077rem;
   }
   .upload-zone p {
-    font-size: 10px;
+    font-size: 0.769231rem;
   }
   .template-row {
     align-items: flex-start;
-    font-size: 8px;
+    font-size: 0.615385rem;
     line-height: 2;
   }
   .template-row .text-button {
-    font-size: 9px;
+    font-size: 0.692308rem;
     white-space: nowrap;
   }
   .swap-form-part {
@@ -2918,26 +2918,26 @@ tbody tr:hover {
     margin-top: 23px;
   }
   .swap-form-part .field > span {
-    font-size: 10px;
+    font-size: 0.769231rem;
   }
   .swap-form-part .field select {
-    font-size: 10px;
+    font-size: 0.769231rem;
   }
   .three-dates {
     gap: 6px;
     padding: 14px 4px;
   }
   .three-dates b {
-    font-size: 9px;
+    font-size: 0.692308rem;
   }
   .three-dates small {
-    font-size: 8px;
+    font-size: 0.615385rem;
   }
   .day-person .person-cell strong {
-    font-size: 10px;
+    font-size: 0.769231rem;
   }
   .day-person .person-cell small {
-    font-size: 8px;
+    font-size: 0.615385rem;
   }
   .profile-stats {
     grid-template-columns: 1fr 1fr;
@@ -2952,26 +2952,26 @@ tbody tr:hover {
     border-bottom: 0;
   }
   .profile-stats span {
-    font-size: 9px;
+    font-size: 0.692308rem;
   }
   .profile-stats b {
-    font-size: 25px;
+    font-size: 1.923077rem;
   }
   .profile-hero h3 {
-    font-size: 17px;
+    font-size: 1.307692rem;
   }
   .next-shift p {
-    font-size: 10px;
+    font-size: 0.769231rem;
   }
   .next-shift > b {
-    font-size: 10px;
+    font-size: 0.769231rem;
   }
   .next-shift > svg {
     width: 20px;
   }
   .toast {
     bottom: 15px;
-    font-size: 10px;
+    font-size: 0.769231rem;
     padding: 12px 13px;
     gap: 9px;
     width: max-content;
@@ -2983,19 +2983,19 @@ tbody tr:hover {
     padding: 20px;
   }
   .settings-title h2 {
-    font-size: 13px;
+    font-size: 1rem;
   }
   .settings-title p {
-    font-size: 9px;
+    font-size: 0.692308rem;
   }
   .body-text {
-    font-size: 10px;
+    font-size: 0.769231rem;
   }
   .backup-actions {
     gap: 8px;
   }
   .backup-actions .button {
-    font-size: 9px;
+    font-size: 0.692308rem;
   }
   .events-settings {
     padding: 0;
@@ -3013,14 +3013,14 @@ tbody tr:hover {
     gap: 10px;
   }
   .swap-record h3 {
-    font-size: 12px;
+    font-size: 0.923077rem;
     gap: 7px;
   }
   .swap-record p {
-    font-size: 10px;
+    font-size: 0.769231rem;
   }
   .swap-record small {
-    font-size: 8px;
+    font-size: 0.615385rem;
   }
   .swap-record-icon {
     width: 33px;
@@ -3099,14 +3099,14 @@ tbody tr:hover {
   flex-shrink: 0;
 }
 .shift-chip {
-  font-size: 10px;
+  font-size: 0.769231rem;
   color: var(--c-527d63);
 }
 .shift-chip.chip-1 {
   color: var(--c-617f98);
 }
 .reserve-count {
-  font-size: 9px;
+  font-size: 0.692308rem;
   color: var(--c-8f9f86);
 }
 .day-number {
@@ -3119,7 +3119,7 @@ tbody tr:hover {
   min-height: 116px;
 }
 .cell-event {
-  font-size: 8px;
+  font-size: 0.615385rem;
   color: var(--c-a88471);
 }
 .calendar-top {
@@ -3130,7 +3130,7 @@ tbody tr:hover {
   padding-bottom: 17px;
 }
 .field-explanation {
-  font-size: 10px;
+  font-size: 0.769231rem;
   color: var(--c-93a382);
   line-height: 2;
   margin-bottom: 15px;
@@ -3140,7 +3140,7 @@ tbody tr:hover {
     min-height: 133px;
   }
   .shift-chip {
-    font-size: 11px;
+    font-size: 0.846154rem;
   }
 }
 @media (max-width: 1000px) {
@@ -3148,10 +3148,10 @@ tbody tr:hover {
     min-height: 116px;
   }
   .shift-chip {
-    font-size: 9px;
+    font-size: 0.692308rem;
   }
   .reserve-count {
-    font-size: 8px;
+    font-size: 0.615385rem;
   }
 }
 @media (max-width: 760px) {
@@ -3159,13 +3159,13 @@ tbody tr:hover {
     min-height: 116px;
   }
   .shift-chip {
-    font-size: 9px;
+    font-size: 0.692308rem;
   }
   .sidebar {
     overflow-y: auto;
   }
   .field-explanation {
-    font-size: 9px;
+    font-size: 0.692308rem;
   }
 }
 @media (max-height: 850px) {

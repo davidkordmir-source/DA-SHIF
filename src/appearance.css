@@ -29,7 +29,7 @@
   background: color-mix(in srgb, var(--c-fff) 92%, transparent);
 }
 .page-heading h1 {
-  font-size: 30px;
+  font-size: 2.307692rem;
   letter-spacing: -1.3px;
 }
 .page-heading {
@@ -126,18 +126,18 @@
   box-shadow: 0 6px 20px color-mix(in srgb, var(--green) 8%, transparent);
 }
 .appearance-eyebrow {
-  font-size: 10px;
+  font-size: 0.769231rem;
   color: var(--c-8b9991);
   margin-bottom: 6px;
 }
 .appearance-header h2 {
-  font-size: 22px;
+  font-size: 1.692308rem;
   font-weight: 750;
   color: var(--c-273e34);
   letter-spacing: -0.8px;
 }
 .appearance-header p {
-  font-size: 11px;
+  font-size: 0.846154rem;
   color: var(--c-8b9991);
   margin-top: 9px;
   line-height: 1.9;
@@ -155,7 +155,7 @@
   align-items: center;
   gap: 8px;
   color: var(--c-3a5144);
-  font-size: 13px;
+  font-size: 1rem;
   font-weight: 600;
   margin-bottom: 19px;
 }
@@ -163,7 +163,7 @@
   color: var(--green);
 }
 .appearance-label > span {
-  font-size: 9px;
+  font-size: 0.692308rem;
   font-weight: 400;
   color: var(--c-8b9991);
   margin-right: auto;
@@ -255,7 +255,7 @@
   box-shadow: 0 2px 5px #0002;
 }
 .theme-option > strong {
-  font-size: 11px;
+  font-size: 0.846154rem;
   display: block;
   color: var(--c-3a5144);
   font-weight: 600;
@@ -263,7 +263,7 @@
 }
 .theme-option > small {
   display: block;
-  font-size: 9px;
+  font-size: 0.692308rem;
   color: var(--c-8b9991);
   margin: 0 4px;
 }
@@ -292,7 +292,7 @@
   border-color: var(--green);
 }
 .font-sample {
-  font-size: 21px;
+  font-size: 1.615385rem;
   color: var(--c-3a5144);
   font-weight: 650;
   display: block;
@@ -305,12 +305,12 @@
   gap: 10px;
 }
 .font-option strong {
-  font-size: 11px;
+  font-size: 0.846154rem;
   color: var(--c-3a5144);
   font-weight: 600;
 }
 .font-option small {
-  font-size: 9px;
+  font-size: 0.692308rem;
   color: var(--c-8b9991);
 }
 .font-option svg {
@@ -348,7 +348,7 @@
 }
 .splash-mini b {
   color: #e4f2ed;
-  font-size: 16px;
+  font-size: 1.230769rem;
   z-index: 1;
   margin-top: 13px;
   letter-spacing: -0.5px;
@@ -377,7 +377,7 @@
   min-width: 0;
 }
 .splash-settings-copy h3 {
-  font-size: 16px;
+  font-size: 1.230769rem;
   font-weight: 650;
   color: var(--c-3a5144);
   display: flex;
@@ -388,7 +388,7 @@
   color: var(--green);
 }
 .splash-settings-copy p {
-  font-size: 11px;
+  font-size: 0.846154rem;
   line-height: 2.2;
   color: var(--c-8b9991);
   margin-top: 11px;
@@ -399,7 +399,7 @@
   color: var(--c-3a5144);
 }
 .splash-settings-copy > small {
-  font-size: 9px;
+  font-size: 0.692308rem;
   color: var(--c-8b9991);
   display: block;
   margin-top: 8px;
@@ -412,7 +412,7 @@
   flex-wrap: wrap;
 }
 .custom-logo-badge {
-  font-size: 9px;
+  font-size: 0.692308rem;
   color: var(--green);
   display: flex;
   gap: 5px;
@@ -426,7 +426,7 @@
   background: color-mix(in srgb, var(--green) 5%, var(--c-fff));
   padding: 9px 12px;
   border-radius: 6px;
-  font-size: 10px !important;
+  font-size: 0.769231rem !important;
   margin-top: 17px !important;
 }
 .help-hero > .help-logo {
@@ -471,7 +471,7 @@ body {
     height: 100px;
   }
   .font-sample {
-    font-size: 18px;
+    font-size: 1.384615rem;
   }
   .appearance-content {
     padding: 25px;
@@ -491,7 +491,7 @@ body {
     align-items: flex-start;
   }
   .appearance-header h2 {
-    font-size: 18px;
+    font-size: 1.384615rem;
   }
   .appearance-icon {
     width: 42px;
@@ -502,11 +502,11 @@ body {
     width: 21px;
   }
   .appearance-header p {
-    font-size: 9px;
+    font-size: 0.692308rem;
     line-height: 2;
   }
   .appearance-eyebrow {
-    font-size: 8px;
+    font-size: 0.615385rem;
   }
   .appearance-sparkle {
     display: none;
@@ -522,16 +522,16 @@ body {
     height: 90px;
   }
   .theme-option > strong {
-    font-size: 11px;
+    font-size: 0.846154rem;
   }
   .theme-option > small {
-    font-size: 8px;
+    font-size: 0.615385rem;
   }
   .appearance-label {
-    font-size: 12px;
+    font-size: 0.923077rem;
   }
   .appearance-label > span {
-    font-size: 8px;
+    font-size: 0.615385rem;
   }
   .font-grid {
     grid-template-columns: 1fr;
@@ -541,7 +541,7 @@ body {
     padding: 17px;
   }
   .font-sample {
-    font-size: 21px;
+    font-size: 1.615385rem;
     margin-bottom: 12px;
   }
   .splash-settings {
@@ -554,18 +554,18 @@ body {
     height: 200px;
   }
   .splash-settings-copy h3 {
-    font-size: 15px;
+    font-size: 1.153846rem;
   }
   .splash-settings-copy p {
-    font-size: 10px;
+    font-size: 0.769231rem;
   }
   .splash-settings-copy small {
-    font-size: 8px;
+    font-size: 0.615385rem;
   }
   .splash-buttons .button {
-    font-size: 10px;
+    font-size: 0.769231rem;
   }
   .page-heading h1 {
-    font-size: 25px;
+    font-size: 1.923077rem;
   }
 }

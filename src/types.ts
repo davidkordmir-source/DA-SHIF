@@ -13,6 +13,7 @@ export type Attendance = {
   replacementId?: string;
 };
 export type Shift = {
+  scheduleId?: string;
   date: string;
   primary: string[];
   reserve: string[];
@@ -48,6 +49,38 @@ export type Settings = {
   minRestDays: number;
   hijriOffset: number;
 };
+export type ScheduleList = {
+  id: string;
+  name: string;
+  startDate: string;
+  endDate: string;
+  personIds: string[];
+  location?: string;
+};
+export type ShiftArchive = {
+  id: string;
+  schedule: ScheduleList;
+  createdAt: string;
+  recordedBy: string;
+  reason: string;
+  rights: "preserve" | "mistake";
+  restAcknowledged: true;
+  creditedDates: string[];
+  snapshot: {
+    people: Person[];
+    shifts: Shift[];
+    swaps: Swap[];
+    reserveChanges: ReserveChange[];
+    settings: Settings;
+    events: CustomEvent[];
+  };
+};
+export type ShiftReminder = {
+  enabled: boolean;
+  scheduleId: string;
+  time: string;
+  daysBefore: number;
+};
 export type AppData = {
   version: 1;
   demo: boolean;
@@ -58,5 +91,9 @@ export type AppData = {
   events: CustomEvent[];
   settings: Settings;
   schedulingWarnings?: Record<string, string[]>;
+  schedules?: ScheduleList[];
+  locations?: string[];
+  archives?: ShiftArchive[];
+  reminder?: ShiftReminder;
   appearance?: import("./lib/appearance").Appearance;
 };
