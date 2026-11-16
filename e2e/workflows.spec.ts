@@ -63,7 +63,13 @@ test("create a named list using solar pickers and a location, configure its remi
 }) => {
   const errors: string[] = [];
   page.on("pageerror", (e) => errors.push(e.message));
-  await seed(page, fixture());
+  const classified = fixture();
+  classified.people = classified.people.map((p, i) => ({
+    ...p,
+    category: i < 4 ? "night-lead" : i < 8 ? "companion" : "reserve",
+    reserveOnly: i >= 8,
+  }));
+  await seed(page, classified);
   await expect(
     page.getByRole("button", { name: "ورود پرسنل از اکسل", exact: true }),
   ).toHaveCount(0);
@@ -93,6 +99,13 @@ test("create a named list using solar pickers and a location, configure its remi
   await page
     .getByLabel("محل خدمت برنامه", { exact: true })
     .selectOption("بیمارستان مرکزی");
+  await page
+    .getByRole("button", { name: "ادامه: انتخاب همراه", exact: true })
+    .click();
+  await page.getByRole("radio", { name: /بله، فهرست همراه دارم/ }).check();
+  await page
+    .getByRole("button", { name: "ادامه: رزرو و تأیید", exact: true })
+    .click();
   await page.getByRole("button", { name: /ساخت برنامهٔ/ }).click();
   await expect(page.getByRole("dialog")).toHaveCount(0);
   const data = await getData(page);

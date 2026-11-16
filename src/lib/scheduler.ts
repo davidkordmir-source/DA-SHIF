@@ -1,4 +1,18 @@
-import type { AppData, Person, Shift, Swap, AttendanceStatus } from "../types";
+import type {
+  AppData,
+  Person,
+  Shift,
+  Swap,
+  AttendanceStatus,
+  ScheduleRosters,
+  PersonnelCategory,
+} from "../types";
+import {
+  personnelCategory,
+  personnelRoster,
+  personnelCategories,
+  validScheduleRosters,
+} from "./people";
 import { historyShifts, dateRange, requiredRestDays } from "./schedules";
 import { dayDistance, dayOfWeek, eventsFor, monthDates } from "./calendar";
 
@@ -227,31 +241,131 @@ export function generateSchedule(
   };
 }
 
+function orderedScheduleRosters(
+  data: AppData,
+  input: ScheduleRosters,
+): ScheduleRosters {
+  const members = [
+    ...(input.nightLeadIds || []),
+    ...(input.companionIds || []),
+    ...(input.reserveIds || []),
+  ];
+  if (!validScheduleRosters(input, members))
+    throw new Error(
+      "فهرست مسئول شب، همراه و رزرو باید جدا و بدون فرد تکراری باشد؛ ظرفیت رزرو را نیز بررسی کنید.",
+    );
+  const select = (category: PersonnelCategory, ids: string[]) => {
+    if (
+      ids.some(
+        (id) =>
+          !data.people.some(
+            (p) => p.id === id && p.active && personnelCategory(p) === category,
+          ),
+      )
+    )
+      throw new Error(
+        `فهرست ${personnelCategories[category]} شامل فرد غیرفعال، ناشناس یا از دستهٔ دیگری است.`,
+      );
+    return personnelRoster(data.people, category)
+      .filter((p) => ids.includes(p.id))
+      .map((p) => p.id);
+  };
+  return {
+    nightLeadIds: select("night-lead", input.nightLeadIds),
+    companionIds: select("companion", input.companionIds),
+    reserveIds: select("reserve", input.reserveIds),
+    reserveCount: input.reserveCount,
+  };
+}
+
+// New rosters follow the spreadsheet in calendar order. Rest/history checks
+// remain warnings here: silently skipping someone would break the user's order.
+function generateRosterSchedule(
+  data: AppData,
+  dates: string[],
+  rosters: ScheduleRosters,
+) {
+  const history = historyShifts(data);
+  const shifts: Shift[] = [];
+  const warnings: string[] = [];
+  dates.forEach((date, index) => {
+    const lead = rosters.nightLeadIds[index % rosters.nightLeadIds.length];
+    const companion = rosters.companionIds.length
+      ? rosters.companionIds[index % rosters.companionIds.length]
+      : undefined;
+    const shift: Shift = {
+      date,
+      primary: companion ? [lead, companion] : [lead],
+      primaryRoles: companion ? ["night-lead", "companion"] : ["night-lead"],
+      reserve: Array.from(
+        { length: rosters.reserveCount },
+        (_, slot) =>
+          rosters.reserveIds[
+            (index * rosters.reserveCount + slot) % rosters.reserveIds.length
+          ],
+      ),
+      attendance: [],
+    };
+    for (const [slot, id] of shift.primary.entries()) {
+      const conflicts = [...history, ...shifts].filter(
+        (s) =>
+          workingIds(s).includes(id) &&
+          Math.abs(dayDistance(s.date, date)) <= requiredRestDays(data, s),
+      );
+      if (conflicts.length) {
+        const name = data.people.find((p) => p.id === id)!.name;
+        warnings.push(
+          `${date}: ${personnelCategories[shift.primaryRoles![slot]]} «${name}» با فاصلهٔ استراحت تداخل دارد؛ ترتیب اکسل حفظ شد.`,
+        );
+      }
+    }
+    shifts.push(shift);
+  });
+  return {
+    shifts: [...data.shifts, ...shifts].sort((a, b) =>
+      a.date.localeCompare(b.date),
+    ),
+    warnings,
+  };
+}
+
 export function createSchedule(
   data: AppData,
   input: {
     name: string;
     start: string;
     end: string;
-    personIds: string[];
+    personIds?: string[];
     location?: string;
+    rosters?: ScheduleRosters;
   },
 ): AppData {
   const name = input.name.trim();
   if (!name || name.length > 100)
     throw new Error("نام فهرست برنامه را وارد کنید (حداکثر ۱۰۰ حرف).");
   const dates = dateRange(input.start, input.end);
+  if (!input.rosters && data.people.some((p) => p.category !== undefined))
+    throw new Error(
+      "برای برنامهٔ جدید، فهرست مسئول شب و وضعیت همراه را جداگانه مشخص کنید.",
+    );
   const occupied = new Set(historyShifts(data).map((s) => s.date));
   if (dates.some((date) => occupied.has(date)))
     throw new Error(
       "این بازه برنامه یا حق شیفت محفوظ دارد. ابتدا برنامهٔ اشتباه را با ثبت وضعیت حق افراد حذف کنید؛ روزهای دارای حق محفوظ قابل بازنویسی نیستند.",
     );
-  const personIds = [...new Set(input.personIds)];
+  const rosters = input.rosters
+    ? orderedScheduleRosters(data, input.rosters)
+    : undefined;
+  const personIds = rosters
+    ? [...rosters.nightLeadIds, ...rosters.companionIds, ...rosters.reserveIds]
+    : [...new Set(input.personIds || [])];
   if (personIds.some((id) => !data.people.some((p) => p.id === id && p.active)))
     throw new Error("فهرست اعضا شامل فرد نامعتبر یا غیرفعال است.");
   if (input.location && !data.locations?.includes(input.location))
     throw new Error("محل خدمت در فهرست موقعیت‌ها وجود ندارد.");
-  const result = generateSchedule(data, 0, 0, dates, personIds),
+  const result = rosters
+      ? generateRosterSchedule(data, dates, rosters)
+      : generateSchedule(data, 0, 0, dates, personIds),
     id = crypto.randomUUID();
   return {
     ...data,
@@ -267,6 +381,7 @@ export function createSchedule(
         startDate: input.start,
         endDate: input.end,
         personIds,
+        ...(rosters ? { rosters } : {}),
         ...(input.location ? { location: input.location } : {}),
       },
     ],
@@ -298,6 +413,14 @@ export function validateSwap(
     throw new Error(
       "نفر اول باید نیروی اصلی باشد؛ نفر دوم در همان روز از رزروها و در روز دیگر از نیروهای اصلی انتخاب می‌شود.",
     );
+  if (firstDate !== secondDate) {
+    const firstRole = first.primaryRoles?.[first.primary.indexOf(firstId)];
+    const secondRole = second.primaryRoles?.[second.primary.indexOf(secondId)];
+    if ((firstRole || secondRole) && firstRole !== secondRole)
+      throw new Error(
+        "مسئول شب و همراه فقط با همان نقش در روز دیگر جابه‌جا می‌شوند؛ برای جایگزینی از رزرو همان روز استفاده کنید.",
+      );
+  }
   if (
     first.attendance.some((a) => a.personId === firstId) ||
     second.attendance.some((a) => a.personId === secondId)

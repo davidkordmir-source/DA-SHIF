@@ -1,4 +1,5 @@
 export type PersonnelCategory = "night-lead" | "companion" | "reserve";
+export type PrimaryRole = Exclude<PersonnelCategory, "reserve">;
 export type Person = {
   id: string;
   name: string;
@@ -6,6 +7,7 @@ export type Person = {
   active: boolean;
   reserveOnly: boolean;
   category?: PersonnelCategory;
+  rosterOrder?: number;
 };
 export type AttendanceStatus = "present" | "excused" | "unexcused";
 export type Attendance = {
@@ -18,6 +20,7 @@ export type Shift = {
   scheduleId?: string;
   date: string;
   primary: string[];
+  primaryRoles?: PrimaryRole[];
   reserve: string[];
   attendance: Attendance[];
 };
@@ -51,6 +54,12 @@ export type Settings = {
   minRestDays: number;
   hijriOffset: number;
 };
+export type ScheduleRosters = {
+  nightLeadIds: string[];
+  companionIds: string[];
+  reserveIds: string[];
+  reserveCount: number;
+};
 export type ScheduleList = {
   id: string;
   name: string;
@@ -58,6 +67,7 @@ export type ScheduleList = {
   endDate: string;
   personIds: string[];
   location?: string;
+  rosters?: ScheduleRosters;
 };
 export type ShiftArchive = {
   id: string;

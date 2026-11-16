@@ -2,6 +2,7 @@ import type { AppData } from "../types";
 import { generateSchedule } from "./scheduler";
 import { solar, todayKey } from "./calendar";
 import { normalizeAppearance, validAppearance } from "./appearance";
+import { validScheduleRosters } from "./people";
 
 export const STORAGE_KEY = "hamshift:data:v1";
 export const STORAGE_BACKUP_KEY = `${STORAGE_KEY}:backup`;
@@ -251,6 +252,8 @@ export function validateBackup(value: unknown): AppData {
       typeof p.department !== "string" ||
       typeof p.active !== "boolean" ||
       typeof p.reserveOnly !== "boolean" ||
+      (p.rosterOrder !== undefined &&
+        (!Number.isSafeInteger(p.rosterOrder) || p.rosterOrder < 0)) ||
       (p.category !== undefined &&
         (!["night-lead", "companion", "reserve"].includes(p.category) ||
           p.reserveOnly !== (p.category === "reserve")))
@@ -275,6 +278,16 @@ export function validateBackup(value: unknown): AppData {
     )
       return fail("تاریخ یا ساختار یکی از شیفت‌ها معتبر نیست.");
     dates.add(s.date);
+    if (
+      s.primaryRoles !== undefined &&
+      (!Array.isArray(s.primaryRoles) ||
+        s.primaryRoles.length !== s.primary.length ||
+        s.primaryRoles[0] !== "night-lead" ||
+        s.primaryRoles.length < 1 ||
+        s.primaryRoles.length > 2 ||
+        (s.primaryRoles.length === 2 && s.primaryRoles[1] !== "companion"))
+    )
+      return fail("نقش مسئول شب یا همراه با نفرات شیفت سازگار نیست.");
     const participants = [...s.primary, ...s.reserve];
     if (
       new Set(participants).size !== participants.length ||
@@ -413,6 +426,11 @@ export function validateBackup(value: unknown): AppData {
       (list.location !== undefined && typeof list.location !== "string")
     )
       return fail();
+    if (
+      list.rosters !== undefined &&
+      !validScheduleRosters(list.rosters, list.personIds)
+    )
+      return fail("فهرست‌های مسئول شب، همراه و رزرو ناسازگار هستند.");
     scheduleIds.add(list.id);
   }
   for (const shift of d.shifts) {
@@ -420,6 +438,15 @@ export function validateBackup(value: unknown): AppData {
       const list = schedules.find((l) => l.id === shift.scheduleId);
       if (!list || shift.date < list.startDate || shift.date > list.endDate)
         return fail();
+      if (
+        list.rosters &&
+        (shift.primaryRoles?.length !==
+          (list.rosters.companionIds.length ? 2 : 1) ||
+          shift.reserve.length !== list.rosters.reserveCount)
+      )
+        return fail(
+          "ظرفیت مسئول شب، همراه یا رزرو با فهرست برنامه سازگار نیست.",
+        );
     }
   }
   if (
@@ -492,6 +519,11 @@ export function validateBackup(value: unknown): AppData {
       )
         return fail();
       const snapshot = a.snapshot;
+      if (
+        a.schedule.rosters !== undefined &&
+        !validScheduleRosters(a.schedule.rosters, a.schedule.personIds)
+      )
+        return fail("فهرست نقش‌ها در بایگانی ناسازگار است.");
       const validated = validateBackup({
         version: 1,
         demo: false,
@@ -504,6 +536,18 @@ export function validateBackup(value: unknown): AppData {
         events: snapshot.events,
         settings: snapshot.settings,
       });
+      if (
+        a.schedule.rosters &&
+        validated.shifts.some(
+          (s) =>
+            s.primaryRoles?.length !==
+              (a.schedule.rosters!.companionIds.length ? 2 : 1) ||
+            s.reserve.length !== a.schedule.rosters!.reserveCount,
+        )
+      )
+        return fail(
+          "نقش‌ها یا ظرفیت شیفت بایگانی با فهرست برنامه سازگار نیستند.",
+        );
       if (
         a.schedule.personIds.some(
           (id) => !validated.people.some((p) => p.id === id),

@@ -25,7 +25,6 @@ import {
   ShieldCheck,
   Sparkles,
   Trash2,
-  Upload,
   Users,
   UserRoundCheck,
   UserRoundPlus,
@@ -96,6 +95,9 @@ import {
   personDeletionBlocker,
   personnelCategories,
   personnelCategory,
+  personnelRoster,
+  mergeImportedPeople,
+  primaryRoleLabel,
 } from "./lib/people";
 
 import logo from "../assets/hamshift.svg";
@@ -104,8 +106,8 @@ import { ReserveEditor, ReserveHistory } from "./ReserveEditor";
 import { defaultAppearance, themes } from "./lib/appearance";
 import { hasIranCalendar, CALENDAR_ANNUAL_YEAR } from "./lib/iran-calendar";
 import { useToday } from "./lib/use-today";
-import { DatePicker } from "./DatePicker";
 import { ScheduleManager, LocationsPanel } from "./ScheduleManager";
+import { ScheduleWizard, type GenerationForm } from "./ScheduleWizard";
 import { ReportsPanel } from "./ReportsPanel";
 import { ResetPanel } from "./ResetPanel";
 import { ReminderPanel, useShiftReminder } from "./ReminderPanel";
@@ -277,21 +279,30 @@ export default function App() {
     }))
     .filter((e) => e.events.length);
   const activePeople = data.people.filter((p) => p.active);
-  const [generation, setGeneration] = useState({
-    name: `برنامهٔ ${months[month - 1]} ${year}`,
-    start: dates[0],
-    end: dates.at(-1)!,
-    personIds: activePeople.map((p) => p.id),
-    location: "",
-  });
-  const startGenerate = () => {
-    setGeneration({
+  const generationDefaults = (): GenerationForm => {
+    const ids = (category: PersonnelCategory) =>
+      personnelRoster(data.people, category)
+        .filter((p) => p.active)
+        .map((p) => p.id);
+    const reserveIds = ids("reserve");
+    return {
       name: `برنامهٔ ${months[month - 1]} ${year}`,
       start: dates[0],
       end: dates.at(-1)!,
-      personIds: activePeople.map((p) => p.id),
       location: "",
-    });
+      nightLeadIds: ids("night-lead"),
+      companionIds: ids("companion"),
+      hasCompanions: null,
+      reserveIds,
+      reserveCount: Math.min(data.settings.reserveCount, reserveIds.length),
+    };
+  };
+  const [generation, setGeneration] =
+    useState<GenerationForm>(generationDefaults);
+  const [generationStep, setGenerationStep] = useState(0);
+  const startGenerate = () => {
+    setGeneration(generationDefaults());
+    setGenerationStep(0);
     open("generate");
   };
   const selectedMembers =
@@ -478,7 +489,22 @@ export default function App() {
   };
   const handleGenerate = () => {
     try {
-      const next = createSchedule(data, generation);
+      if (generation.hasCompanions === null) {
+        setError("مشخص کنید فهرست همراه دارید یا خیر.");
+        return;
+      }
+      const next = createSchedule(data, {
+        name: generation.name,
+        start: generation.start,
+        end: generation.end,
+        location: generation.location,
+        rosters: {
+          nightLeadIds: generation.nightLeadIds,
+          companionIds: generation.hasCompanions ? generation.companionIds : [],
+          reserveIds: generation.reserveCount ? generation.reserveIds : [],
+          reserveCount: generation.reserveCount,
+        },
+      });
       const warnings = next.schedulingWarnings?.[generation.start] || [];
       if (
         commit(
@@ -532,21 +558,12 @@ export default function App() {
     }
   };
   const applyImport = () => {
-    let people = data.demo ? [] : [...data.people];
-    for (const p of imported) {
-      let i = people.findIndex((q) => q.id === p.id);
-      if (i < 0 && p.id.startsWith("name:")) {
-        const matches = people
-          .map((q, index) => ({ q, index }))
-          .filter(({ q }) => searchable(q.name) === searchable(p.name));
-        if (matches.length > 1) {
-          setError(`برای نام همسان «${p.name}» کد پرسنلی یکتا وارد کنید.`);
-          return;
-        }
-        if (matches.length === 1) i = matches[0].index;
-      }
-      if (i >= 0) people[i] = { ...p, id: people[i].id };
-      else people.push(p);
+    let people: Person[];
+    try {
+      people = mergeImportedPeople(data.demo ? [] : data.people, imported);
+    } catch (e) {
+      setError((e as Error).message);
+      return;
     }
     const next = {
       ...data,
@@ -565,10 +582,31 @@ export default function App() {
       setImported([]);
       setFileName("");
       if (importReturn) {
-        setGeneration((g) => ({
-          ...g,
-          personIds: people.filter((p) => p.active).map((p) => p.id),
-        }));
+        setGeneration((g) => {
+          const changed = new Set(imported.map(personnelCategory));
+          const ids = (category: PersonnelCategory, previous: string[]) => {
+            const roster = personnelRoster(people, category)
+              .filter((p) => p.active)
+              .map((p) => p.id);
+            return changed.has(category)
+              ? roster
+              : previous.filter((id) => roster.includes(id));
+          };
+          return {
+            ...g,
+            nightLeadIds: ids("night-lead", g.nightLeadIds),
+            companionIds: ids("companion", g.companionIds),
+            reserveIds: ids("reserve", g.reserveIds),
+            reserveCount:
+              changed.has("reserve") && !g.reserveCount
+                ? Math.min(
+                    data.settings.reserveCount,
+                    personnelRoster(people, "reserve").filter((p) => p.active)
+                      .length,
+                  )
+                : g.reserveCount,
+          };
+        });
         setImportReturn(false);
         open("generate");
       } else {
@@ -692,11 +730,13 @@ export default function App() {
   const deletionBlocker = deletingPerson
     ? personDeletionBlocker(data, deleteId)
     : undefined;
-  const visiblePeople = data.people.filter(
-    (p) =>
-      searchMatches(p) &&
-      (peopleCategory === "all" || personnelCategory(p) === peopleCategory),
-  );
+  const visiblePeople = (
+    peopleCategory === "all"
+      ? (Object.keys(personnelCategories) as PersonnelCategory[]).flatMap(
+          (category) => personnelRoster(data.people, category),
+        )
+      : personnelRoster(data.people, peopleCategory)
+  ).filter(searchMatches);
   const attendanceShift = data.shifts.find(
     (s) => s.date === attendanceForm.date,
   );
@@ -1249,6 +1289,7 @@ export default function App() {
                                     <span
                                       className={`shift-chip chip-${i % 2}`}
                                       key={id}
+                                      title={`${primaryRoleLabel(shift, id)}: ${name(id)}`}
                                     >
                                       <span />
                                       {name(id)
@@ -1337,8 +1378,8 @@ export default function App() {
                     </div>
                     <h3>سهم برابر، تیم همراه</h3>
                     <p>
-                      شیفت‌های عادی، تعطیلات و روزهای هفته، با در نظر گرفتن
-                      سابقهٔ افراد تقسیم می‌شوند.
+                      نوبت هر دسته به ترتیب فهرست اکسل است. سابقهٔ کارکرد،
+                      تعطیلات و هشدارهای استراحت را پیش از تأیید بررسی کنید.
                     </p>
                     <div className="balance-meter">
                       <span
@@ -1582,6 +1623,7 @@ export default function App() {
                                           ? {
                                               ...q,
                                               category,
+                                              rosterOrder: undefined,
                                               reserveOnly:
                                                 category === "reserve",
                                             }
@@ -2111,20 +2153,11 @@ export default function App() {
                   }}
                 >
                   <div className="form-grid">
-                    <Field label="تعداد نیروی اصلی در روز">
-                      <input
-                        type="number"
-                        min="1"
-                        max="20"
-                        required
-                        value={settings.primaryCount}
-                        onChange={(e) =>
-                          setSettings({
-                            ...settings,
-                            primaryCount: +e.target.value,
-                          })
-                        }
-                      />
+                    <Field label="ترکیب نیروی اصلی در برنامه‌های جدید">
+                      <p>
+                        یک مسئول شب؛ با انتخاب فهرست همراه، یک همراه جداگانه
+                        اضافه می‌شود. بدون همراه، شیفت یک‌نفره است.
+                      </p>
                     </Field>
                     <Field label="تعداد نیروی رزرو در روز">
                       <input
@@ -2371,154 +2404,28 @@ export default function App() {
         />
       )}
       {dialog === "generate" && (
-        <Modal
-          title="ایجاد برنامهٔ عادلانه"
-          subtitle={`${solarLabel(generation.start)} تا ${solarLabel(generation.end)} · شیفت‌های روزانه`}
+        <ScheduleWizard
+          data={data}
+          value={generation}
+          onChange={setGeneration}
+          step={generationStep}
+          onStep={setGenerationStep}
+          onSubmit={handleGenerate}
           onClose={close}
-        >
-          <div className="modal-body form-stack">
-            <div className="generation-visual">
-              <span className="generation-orbit">
-                <WandSparkles size={34} />
-              </span>
-              <h3>یک برنامه، با در نظر گرفتن همه</h3>
-              <p>
-                بازه، اعضا و محل خدمت را انتخاب کنید؛ سابقهٔ قبلی و استراحت
-                بررسی می‌شوند.
-              </p>
-            </div>
-            <Field label="نام فهرست برنامه">
-              <input
-                maxLength={100}
-                value={generation.name}
-                onChange={(e) =>
-                  setGeneration({ ...generation, name: e.target.value })
-                }
-              />
-            </Field>
-            <div className="form-grid">
-              <DatePicker
-                label="تاریخ شروع برنامه"
-                value={generation.start}
-                onChange={(v) => setGeneration({ ...generation, start: v })}
-              />
-              <DatePicker
-                label="تاریخ پایان برنامه"
-                value={generation.end}
-                onChange={(v) => setGeneration({ ...generation, end: v })}
-              />
-              <Field label="محل خدمت برنامه">
-                <Select
-                  value={generation.location}
-                  onChange={(e) =>
-                    setGeneration({ ...generation, location: e.target.value })
-                  }
-                >
-                  <option value="">بدون موقعیت مشخص</option>
-                  {(data.locations || []).map((l) => (
-                    <option key={l}>{l}</option>
-                  ))}
-                </Select>
-              </Field>
-            </div>
-            <div className="generation-team">
-              <div className="section-toolbar">
-                <div>
-                  <h3>اعضای این فهرست</h3>
-                  <p>{fa(generation.personIds.length)} نفر انتخاب شده</p>
-                </div>
-                <button
-                  className="button button-secondary"
-                  onClick={() => {
-                    setImported([]);
-                    setImportErrors([]);
-                    setFileName("");
-                    setImportReturn(true);
-                    open("import");
-                  }}
-                >
-                  <Upload size={16} />
-                  ورود پرسنل از اکسل
-                </button>
-              </div>
-              <div className="row-actions">
-                <button
-                  className="text-button"
-                  onClick={() =>
-                    setGeneration({
-                      ...generation,
-                      personIds: activePeople.map((p) => p.id),
-                    })
-                  }
-                >
-                  انتخاب همه
-                </button>
-                <button
-                  className="text-button"
-                  onClick={() =>
-                    setGeneration({ ...generation, personIds: [] })
-                  }
-                >
-                  لغو انتخاب همه
-                </button>
-              </div>
-              <div className="generation-people">
-                {activePeople.map((p) => (
-                  <label className="checkbox-label" key={p.id}>
-                    <input
-                      type="checkbox"
-                      checked={generation.personIds.includes(p.id)}
-                      onChange={(e) =>
-                        setGeneration({
-                          ...generation,
-                          personIds: e.target.checked
-                            ? [...generation.personIds, p.id]
-                            : generation.personIds.filter((id) => id !== p.id),
-                        })
-                      }
-                    />
-                    <span>
-                      {p.name}
-                      <small>
-                        {p.department}
-                        {` · ${personnelCategories[personnelCategory(p)]}`}
-                      </small>
-                    </span>
-                  </label>
-                ))}
-              </div>
-            </div>
-            <div className="generation-facts">
-              <div>
-                <span>نیروی اصلی روزانه</span>
-                <b>{fa(data.settings.primaryCount)}</b>
-              </div>
-              <div>
-                <span>رزرو روزانه</span>
-                <b>{fa(data.settings.reserveCount)}</b>
-              </div>
-              <div>
-                <span>حداقل استراحت</span>
-                <b>{fa(data.settings.minRestDays)} روز</b>
-              </div>
-            </div>
-            <Notice>
-              برنامه‌های موجود خودکار جایگزین نمی‌شوند. برای تغییر فهرست، ابتدا
-              حذف امن و ثبت وضعیت حق شیفت را انجام دهید. حداکثر بازه ۳۶۶ روز
-              است. کمبود نیرو برای استراحت با هشدار مشخص می‌شود.
-            </Notice>
-            {error && <ErrorText text={error} />}
-          </div>
-          <div className="modal-footer">
-            <button className="button button-primary" onClick={handleGenerate}>
-              <WandSparkles size={17} />
-              ساخت برنامهٔ انتخاب‌شده
-            </button>
-            <button className="button button-secondary" onClick={close}>
-              انصراف
-            </button>
-          </div>
-        </Modal>
+          error={error}
+          onError={setError}
+          onImport={(category) => {
+            setImported([]);
+            setImportErrors([]);
+            setFileName("");
+            setSheetNames([]);
+            setSheetName("");
+            selectedExcel.current = undefined;
+            setImportCategory(category);
+            setImportReturn(true);
+            open("import");
+          }}
+        />
       )}
 
       {dialog === "import" && (
@@ -3339,7 +3246,7 @@ export default function App() {
               [
                 "۲",
                 "برنامهٔ ماه را بسازید",
-                "ماه دلخواه را انتخاب کنید و «ایجاد برنامهٔ عادلانه» را بزنید. پیش‌فرض، روزانه دو نفر اصلی و دو نفر رزرو است.",
+                "بازه را انتخاب و فهرست مسئول شب را وارد کنید؛ سپس داشتن فهرست همراه را مشخص کنید. بدون همراه، هر روز فقط یک مسئول شب دارد. نوبت هر دسته به ترتیب ردیف اکسل است.",
               ],
               [
                 "۳",
@@ -3544,7 +3451,15 @@ function ShiftTable({
               <td className={events(s.date) ? "red-text" : ""}>
                 {weekdays[dayOfWeek(s.date)]}
               </td>
-              <td>{s.primary.map(name).join("، ")}</td>
+              <td>
+                {s.primary
+                  .map((id) =>
+                    s.primaryRoles
+                      ? `${primaryRoleLabel(s, id)}: ${name(id)}`
+                      : name(id),
+                  )
+                  .join("، ")}
+              </td>
               <td>{s.reserve.map(name).join("، ")}</td>
               <td>
                 <button
@@ -3647,6 +3562,9 @@ function DayDrawer({
                     <span>
                       <strong>{name(id)}</strong>
                       <small>
+                        {shift.primaryRoles
+                          ? `${primaryRoleLabel(shift, id)} · `
+                          : ""}
                         {a ? statusLabels[a.status] : "وضعیت ثبت نشده"}
                       </small>
                     </span>

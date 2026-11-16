@@ -1,6 +1,10 @@
 import ExcelJS from "exceljs";
 import type { AppData, Person, PersonnelCategory } from "../types";
-import { personnelCategories, personnelCategory } from "./people";
+import {
+  personnelCategories,
+  personnelCategory,
+  primaryRoleLabel,
+} from "./people";
 import {
   fa,
   latin,
@@ -176,6 +180,7 @@ export async function readPeople(
       name,
       department: deptCol ? cellText(row, deptCol).slice(0, 100) : "",
       active: true,
+      rosterOrder: people.length,
       reserveOnly: category ? category === "reserve" : reserveOnly,
       ...(category ? { category } : {}),
     });
@@ -214,7 +219,11 @@ export function buildScheduleWorkbook(data: AppData, dates: string[]) {
       date,
       weekdays[dayOfWeek(date)],
       e.holiday ? "تعطیل" : "عادی",
-      s?.primary.map(name).join("، ") || "",
+      s?.primary
+        .map((id) =>
+          s.primaryRoles ? `${primaryRoleLabel(s, id)}: ${name(id)}` : name(id),
+        )
+        .join("، ") || "",
       s?.reserve.map(name).join("، ") || "",
       e.events.map((e) => e.title).join("، "),
       s?.attendance

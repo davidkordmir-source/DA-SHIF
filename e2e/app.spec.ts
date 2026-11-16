@@ -71,6 +71,11 @@ test("Excel import, generation, export, attendance, swaps, and backup work", asy
   expect((await getData(page)).people).toHaveLength(12);
   expect((await getData(page)).shifts).toHaveLength(0);
   await page.getByRole("button", { name: "انصراف", exact: true }).click();
+  await page.getByRole("button", { name: /^پرسنل/ }).click();
+  for (let i = 6; i < 12; i++)
+    await page
+      .getByLabel(`دستهٔ همکار آزمایشی ${i + 1}`, { exact: true })
+      .selectOption(i < 9 ? "companion" : "reserve");
   await page.getByRole("button", { name: "تنظیمات", exact: true }).click();
   await page.getByLabel("حداقل روز استراحت بین دو شیفت").fill("0");
   await page.getByRole("button", { name: "ذخیرهٔ تنظیمات" }).click();
@@ -78,6 +83,13 @@ test("Excel import, generation, export, attendance, swaps, and backup work", asy
     .getByRole("button", { name: "برنامهٔ شیفت‌ها", exact: true })
     .click();
   await page.getByRole("button", { name: "ایجاد برنامهٔ عادلانه" }).click();
+  await page
+    .getByRole("button", { name: "ادامه: انتخاب همراه", exact: true })
+    .click();
+  await page.getByRole("radio", { name: /بله، فهرست همراه دارم/ }).check();
+  await page
+    .getByRole("button", { name: "ادامه: رزرو و تأیید", exact: true })
+    .click();
   await page.getByRole("button", { name: /ساخت برنامهٔ/ }).click();
   const generated = await getData(page);
   expect(generated.shifts.length).toBeGreaterThan(27);
