@@ -1,0 +1,158 @@
+/* Gentle motion and category accents follow the user's chosen theme. */
+.people-panel {
+  overflow: hidden;
+}
+.people-categories {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+  margin: 6px 0 18px;
+}
+.people-category {
+  --category-accent: var(--green);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  text-align: right;
+  padding: 19px 16px;
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  background: color-mix(in srgb, var(--category-accent) 5%, var(--c-fff));
+  color: var(--c-283c38);
+  transition:
+    transform 0.2s ease,
+    box-shadow 0.2s ease,
+    border-color 0.2s ease;
+}
+.category-night-lead {
+  --category-accent: #8670d5;
+}
+.category-companion {
+  --category-accent: #268c9c;
+}
+.category-reserve {
+  --category-accent: #b98324;
+}
+.people-category > svg {
+  color: var(--category-accent);
+  flex-shrink: 0;
+}
+.people-category span {
+  font-weight: 700;
+}
+.people-category small {
+  display: block;
+  margin-top: 5px;
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 400;
+}
+.people-category b {
+  margin-inline-start: auto;
+  font-size: 1.7rem;
+  color: var(--category-accent);
+}
+.people-category.selected {
+  border-color: var(--category-accent);
+  box-shadow: 0 4px 16px
+    color-mix(in srgb, var(--category-accent) 12%, transparent);
+  background: color-mix(in srgb, var(--category-accent) 10%, var(--c-fff));
+}
+.people-category:hover {
+  transform: translateY(-3px);
+}
+.people-category:focus-visible,
+.person-category-select:focus-visible {
+  outline: 3px solid var(--category-accent, var(--green));
+  outline-offset: 3px;
+}
+.people-import-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 18px;
+  margin-bottom: 18px;
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--green) 6%, transparent);
+}
+.people-import-bar > span {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  color: var(--muted);
+}
+.person-category-select {
+  min-width: 115px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 7px 10px;
+  color: inherit;
+  background: var(--c-fff);
+}
+.person-delete {
+  color: #c34d58;
+  margin-inline-start: 12px;
+}
+.person-delete-confirm {
+  background: #b73545;
+  color: white;
+}
+.import-category-controls {
+  margin-bottom: 12px;
+}
+@media (max-width: 1100px) {
+  .people-categories {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+@media (max-width: 600px) {
+  .people-category {
+    padding: 13px 10px;
+    gap: 8px;
+  }
+  .people-category small {
+    font-size: 0.7rem;
+  }
+  .people-category b {
+    font-size: 1.3rem;
+  }
+  .people-import-bar {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .people-panel {
+    animation: people-arrive 0.3s ease-out both;
+  }
+  .button,
+  .icon-button,
+  .text-button {
+    transition:
+      background-color 0.18s ease,
+      box-shadow 0.18s ease,
+      transform 0.18s ease;
+  }
+  .button:active {
+    transform: scale(0.98);
+  }
+  @keyframes people-arrive {
+    from {
+      opacity: 0;
+      transform: translateY(8px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .people-category {
+    transition: none;
+  }
+  .people-category:hover {
+    transform: none;
+  }
+}

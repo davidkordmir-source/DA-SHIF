@@ -15,7 +15,12 @@ function emptyData(): AppData {
     shifts: [],
     swaps: [],
     events: [],
-    settings: { primaryCount: 2, reserveCount: 2, minRestDays: 1, hijriOffset: 0 },
+    settings: {
+      primaryCount: 2,
+      reserveCount: 2,
+      minRestDays: 1,
+      hijriOffset: 0,
+    },
   };
 }
 
@@ -36,7 +41,9 @@ export function parseBackup(raw: string): AppData {
     // Windows text editors and exported JSON files may add a UTF-8 BOM.
     parsed = JSON.parse(raw.replace(/^\uFEFF/, ""));
   } catch {
-    throw new Error("فایل اطلاعات ناقص است یا ساختار JSON آن قابل خواندن نیست.");
+    throw new Error(
+      "فایل اطلاعات ناقص است یا ساختار JSON آن قابل خواندن نیست.",
+    );
   }
   return validateBackup(parsed);
 }
@@ -87,7 +94,9 @@ export function saveData(data: AppData, recovering = false): AppData {
   const validated = validateBackup(data);
   const json = JSON.stringify(validated);
   if (new Blob([json]).size > MAX_BYTES)
-    throw new Error("حجم اطلاعات بیشتر از ۱۰ مگابایت است. اطلاعات قبلی حفظ شدند؛ برای ادامه به نسخهٔ پشتیبان و بررسی حجم داده‌ها نیاز است.");
+    throw new Error(
+      "حجم اطلاعات بیشتر از ۱۰ مگابایت است. اطلاعات قبلی حفظ شدند؛ برای ادامه به نسخهٔ پشتیبان و بررسی حجم داده‌ها نیاز است.",
+    );
   if (typeof window !== "undefined" && window.desktop) {
     const result = window.desktop.writeData(json, recovering);
     if (!result.ok)
@@ -97,20 +106,33 @@ export function saveData(data: AppData, recovering = false): AppData {
     if (previous === json && !recovering) return validated;
     if (previous !== null) {
       let valid = false;
-      try { parseBackup(previous); valid = true; } catch { /* Preserve separately below. */ }
+      try {
+        parseBackup(previous);
+        valid = true;
+      } catch {
+        /* Preserve separately below. */
+      }
       if (recovering || !valid)
-        localStorage.setItem(`${STORAGE_KEY}:recovery:${crypto.randomUUID()}`, previous);
-      else
-        localStorage.setItem(STORAGE_BACKUP_KEY, previous);
+        localStorage.setItem(
+          `${STORAGE_KEY}:recovery:${crypto.randomUUID()}`,
+          previous,
+        );
+      else localStorage.setItem(STORAGE_BACKUP_KEY, previous);
     }
     if (recovering) {
       const oldBackup = localStorage.getItem(STORAGE_BACKUP_KEY);
       if (oldBackup !== json) {
         if (oldBackup !== null)
-          localStorage.setItem(`${STORAGE_BACKUP_KEY}:recovery:${crypto.randomUUID()}`, oldBackup);
+          localStorage.setItem(
+            `${STORAGE_BACKUP_KEY}:recovery:${crypto.randomUUID()}`,
+            oldBackup,
+          );
         localStorage.setItem(STORAGE_BACKUP_KEY, json);
       }
-    } else if (previous === null && localStorage.getItem(STORAGE_BACKUP_KEY) === null) {
+    } else if (
+      previous === null &&
+      localStorage.getItem(STORAGE_BACKUP_KEY) === null
+    ) {
       localStorage.setItem(STORAGE_BACKUP_KEY, json);
     }
     localStorage.setItem(STORAGE_KEY, json);
@@ -143,12 +165,16 @@ export function loadData(): LoadedData {
     if (!primaryMissing) {
       const data = parseBackup(raw!);
       const original = JSON.parse(raw!.replace(/^\uFEFF/, ""));
-      const repaired = original.appearance !== undefined && !validAppearance(original.appearance);
+      const repaired =
+        original.appearance !== undefined &&
+        !validAppearance(original.appearance);
       return {
         data,
         source: "primary",
         needsSave: repaired,
-        notice: repaired ? "تنظیمات ظاهری ناسازگار اصلاح شدند؛ اطلاعات پرسنل و سوابق حفظ شدند." : undefined,
+        notice: repaired
+          ? "تنظیمات ظاهری ناسازگار اصلاح شدند؛ اطلاعات پرسنل و سوابق حفظ شدند."
+          : undefined,
       };
     }
   } catch (error) {
@@ -179,7 +205,8 @@ export function loadData(): LoadedData {
         data,
         source: "backup",
         needsSave: true,
-        notice: "فایل اصلی قابل استفاده نبود؛ آخرین پشتیبان خودکار معتبر بازیابی شد. ممکن است آخرین تغییرات در آن نباشد. فایل اصلی برای بررسی جداگانه حفظ می‌شود.",
+        notice:
+          "فایل اصلی قابل استفاده نبود؛ آخرین پشتیبان خودکار معتبر بازیابی شد. ممکن است آخرین تغییرات در آن نباشد. فایل اصلی برای بررسی جداگانه حفظ می‌شود.",
       };
     }
   } catch (error) {
@@ -198,9 +225,7 @@ export function loadData(): LoadedData {
 }
 export function validateBackup(value: unknown): AppData {
   const fail = (detail = "ساختار اصلی اطلاعات معتبر نیست.") => {
-    throw new Error(
-      `اطلاعات هم‌شیفت ناسازگار است: ${detail}`,
-    );
+    throw new Error(`اطلاعات هم‌شیفت ناسازگار است: ${detail}`);
   };
   if (!value || typeof value !== "object") return fail();
   const d = value as AppData;
@@ -225,7 +250,10 @@ export function validateBackup(value: unknown): AppData {
       !p.name.trim() ||
       typeof p.department !== "string" ||
       typeof p.active !== "boolean" ||
-      typeof p.reserveOnly !== "boolean"
+      typeof p.reserveOnly !== "boolean" ||
+      (p.category !== undefined &&
+        (!["night-lead", "companion", "reserve"].includes(p.category) ||
+          p.reserveOnly !== (p.category === "reserve")))
     )
       return fail("اطلاعات پرسنل ناقص است یا کد پرسنلی تکراری دارد.");
     ids.add(p.id);

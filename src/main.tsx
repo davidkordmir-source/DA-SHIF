@@ -8,6 +8,7 @@ import "./appearance.css";
 import "./theme-designs.css";
 import "./reserves.css";
 import "./workflows.css";
+import "./people.css";
 
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>

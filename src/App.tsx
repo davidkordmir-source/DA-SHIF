@@ -37,7 +37,13 @@ import {
   FileUp,
   CircleCheck,
 } from "lucide-react";
-import type { AppData, AttendanceStatus, Person, Settings } from "./types";
+import type {
+  AppData,
+  AttendanceStatus,
+  Person,
+  PersonnelCategory,
+  Settings,
+} from "./types";
 import {
   Avatar,
   Badge,
@@ -78,7 +84,19 @@ import {
   exportSchedule,
   readPeople,
 } from "./lib/excel";
-import { loadData, parseBackup, saveData, storageErrorMessage } from "./lib/storage";
+import {
+  loadData,
+  parseBackup,
+  saveData,
+  storageErrorMessage,
+} from "./lib/storage";
+
+import {
+  deletePerson,
+  personDeletionBlocker,
+  personnelCategories,
+  personnelCategory,
+} from "./lib/people";
 
 import logo from "../assets/hamshift.svg";
 import { AppearancePanel } from "./AppearancePanel";
@@ -109,6 +127,7 @@ type Dialog =
   | "attendance"
   | "reserve"
   | "person"
+  | "delete-person"
   | "help"
   | "event"
   | "profile"
@@ -150,7 +169,9 @@ export default function App() {
 
   const [storageError, setStorageError] = useState(loaded.error || "");
   const [storageNotice, setStorageNotice] = useState(loaded.notice || "");
-  const [needsRecovery, setNeedsRecovery] = useState(loaded.source === "unavailable");
+  const [needsRecovery, setNeedsRecovery] = useState(
+    loaded.source === "unavailable",
+  );
   const pendingRecovery = useRef(loaded.source === "backup");
   const initializedStorage = useRef(false);
   const [page, setPage] = useState<Page>("schedule");
@@ -175,6 +196,18 @@ export default function App() {
   const [settings, setSettings] = useState<Settings>(data.settings);
   const [imported, setImported] = useState<Person[]>([]),
     [importErrors, setImportErrors] = useState<string[]>([]);
+  const [peopleCategory, setPeopleCategory] = useState<
+    PersonnelCategory | "all"
+  >("all");
+  const [importCategory, setImportCategory] = useState<
+    PersonnelCategory | "auto"
+  >("auto");
+  const [sheetNames, setSheetNames] = useState<string[]>([]);
+  const [sheetName, setSheetName] = useState("");
+  const selectedExcel = useRef<File | undefined>(undefined);
+  const importReadId = useRef(0);
+  const [deleteId, setDeleteId] = useState("");
+  const [deleteConfirmation, setDeleteConfirmation] = useState("");
   const [fileName, setFileName] = useState("");
   const [swapForm, setSwapForm] = useState({
     firstDate: today,
@@ -203,6 +236,7 @@ export default function App() {
     name: "",
     department: "",
     reserveOnly: false,
+    category: "companion" as PersonnelCategory,
   });
   const [eventForm, setEventForm] = useState({
     date: solarInput(today),
@@ -312,7 +346,9 @@ export default function App() {
   const commit = (next: AppData, message?: string, recovering = false) => {
     if (needsRecovery && !recovering) {
       setError(storageError);
-      showToast("اطلاعات قبلی هنوز قابل خواندن نیستند. دوباره تلاش کنید یا پشتیبان معتبر بازیابی کنید؛ فایل‌ها را حذف نکنید.");
+      showToast(
+        "اطلاعات قبلی هنوز قابل خواندن نیستند. دوباره تلاش کنید یا پشتیبان معتبر بازیابی کنید؛ فایل‌ها را حذف نکنید.",
+      );
       return false;
     }
     try {
@@ -462,21 +498,36 @@ export default function App() {
       setError((e as Error).message);
     }
   };
-  const handleExcel = async (file?: File) => {
+  const handleExcel = async (
+    file?: File,
+    chosenSheet?: string,
+    category = importCategory,
+  ) => {
     if (!file) return;
+    const readId = ++importReadId.current;
     setBusy(true);
     setError("");
     setImported([]);
     setImportErrors([]);
     setFileName(file.name);
+    selectedExcel.current = file;
     try {
-      const result = await readPeople(file);
+      const result = await readPeople(file, {
+        sheetName: chosenSheet,
+        category: category === "auto" ? undefined : category,
+      });
+      if (readId !== importReadId.current) return;
+      setSheetNames(result.sheetNames);
+      setSheetName(result.sheetName);
       setImported(result.people);
       setImportErrors(result.errors);
     } catch (e) {
+      if (readId !== importReadId.current) return;
+      setSheetNames([]);
+      setSheetName("");
       setError((e as Error).message);
     } finally {
-      setBusy(false);
+      if (readId === importReadId.current) setBusy(false);
       if (importInput.current) importInput.current.value = "";
     }
   };
@@ -544,7 +595,9 @@ export default function App() {
   };
   const backup = () => {
     if (needsRecovery) {
-      showToast("اطلاعات قبلی هنوز خوانده نشده‌اند؛ برای جلوگیری از دریافت پشتیبان خالی، ابتدا خواندن دوباره یا بازیابی را انجام دهید.");
+      showToast(
+        "اطلاعات قبلی هنوز خوانده نشده‌اند؛ برای جلوگیری از دریافت پشتیبان خالی، ابتدا خواندن دوباره یا بازیابی را انجام دهید.",
+      );
       return;
     }
     download(
@@ -635,6 +688,15 @@ export default function App() {
         ),
     );
   const profilePerson = person(personId);
+  const deletingPerson = person(deleteId);
+  const deletionBlocker = deletingPerson
+    ? personDeletionBlocker(data, deleteId)
+    : undefined;
+  const visiblePeople = data.people.filter(
+    (p) =>
+      searchMatches(p) &&
+      (peopleCategory === "all" || personnelCategory(p) === peopleCategory),
+  );
   const attendanceShift = data.shifts.find(
     (s) => s.date === attendanceForm.date,
   );
@@ -853,6 +915,7 @@ export default function App() {
                         name: "",
                         department: "",
                         reserveOnly: false,
+                        category: "companion",
                       });
                       open("person");
                     }}
@@ -916,11 +979,17 @@ export default function App() {
               <div role="alert">
                 <p>{storageError}</p>
                 <div className="backup-actions">
-                  <button className="button button-secondary" onClick={retryStorage}>
+                  <button
+                    className="button button-secondary"
+                    onClick={retryStorage}
+                  >
                     تلاش دوباره برای ذخیره‌سازی
                   </button>
                   {window.desktop && (
-                    <button className="button button-secondary" onClick={() => window.desktop?.openDataFolder()}>
+                    <button
+                      className="button button-secondary"
+                      onClick={() => window.desktop?.openDataFolder()}
+                    >
                       پوشهٔ اطلاعات
                     </button>
                   )}
@@ -1370,7 +1439,7 @@ export default function App() {
           )}
 
           {page === "people" && (
-            <section className="panel">
+            <section className="panel people-panel">
               <div className="section-toolbar">
                 <div>
                   <h2>
@@ -1384,6 +1453,79 @@ export default function App() {
                   onChange={setQuery}
                   placeholder="جست‌وجوی نام، کد یا واحد..."
                 />
+              </div>
+              <div className="people-categories" aria-label="دسته‌بندی پرسنل">
+                <button
+                  className={`people-category category-all ${peopleCategory === "all" ? "selected" : ""}`}
+                  aria-pressed={peopleCategory === "all"}
+                  onClick={() => setPeopleCategory("all")}
+                >
+                  <Users size={22} />
+                  <span>
+                    همهٔ اعضا<small>یک تیم، کنار هم</small>
+                  </span>
+                  <b>{fa(data.people.length)}</b>
+                </button>
+                {(
+                  Object.entries(personnelCategories) as [
+                    PersonnelCategory,
+                    string,
+                  ][]
+                ).map(([category, label]) => (
+                  <button
+                    key={category}
+                    className={`people-category category-${category} ${peopleCategory === category ? "selected" : ""}`}
+                    aria-pressed={peopleCategory === category}
+                    onClick={() => setPeopleCategory(category)}
+                  >
+                    {category === "night-lead" ? (
+                      <Sparkles size={22} />
+                    ) : category === "reserve" ? (
+                      <ShieldCheck size={22} />
+                    ) : (
+                      <UserRoundCheck size={22} />
+                    )}
+                    <span>
+                      {label}
+                      <small>
+                        {category === "night-lead"
+                          ? "هماهنگی و همراهی شب"
+                          : category === "reserve"
+                            ? "آماده برای پشتیبانی"
+                            : "همراهِ تیم در هر شیفت"}
+                      </small>
+                    </span>
+                    <b>
+                      {fa(
+                        data.people.filter(
+                          (p) => personnelCategory(p) === category,
+                        ).length,
+                      )}
+                    </b>
+                  </button>
+                ))}
+              </div>
+              <div className="people-import-bar">
+                <span>
+                  <FileSpreadsheet size={18} /> هر دسته، فایل یا شیت خودش را
+                  دارد.
+                </span>
+                <button
+                  className="text-button"
+                  onClick={() => {
+                    setImportCategory(
+                      peopleCategory === "all" ? "auto" : peopleCategory,
+                    );
+                    setImported([]);
+                    setSheetNames([]);
+                    setSheetName("");
+                    selectedExcel.current = undefined;
+                    setFileName("");
+                    open("import");
+                  }}
+                >
+                  ورود اکسل این دسته <ArrowLeft size={16} />
+                </button>
               </div>
               {data.people.length ? (
                 <div className="table-scroll">
@@ -1400,7 +1542,7 @@ export default function App() {
                       </tr>
                     </thead>
                     <tbody>
-                      {data.people.filter(searchMatches).map((p, i) => {
+                      {visiblePeople.map((p, i) => {
                         const next = data.shifts
                           .filter(
                             (s) => s.date >= today && s.primary.includes(p.id),
@@ -1425,7 +1567,39 @@ export default function App() {
                             </td>
                             <td>{p.department || "—"}</td>
                             <td>
-                              {p.reserveOnly ? "فقط رزرو" : "اصلی و رزرو"}
+                              <select
+                                className="person-category-select"
+                                aria-label={`دستهٔ ${p.name}`}
+                                value={personnelCategory(p)}
+                                onChange={(e) => {
+                                  const category = e.target
+                                    .value as PersonnelCategory;
+                                  commit(
+                                    {
+                                      ...data,
+                                      people: data.people.map((q) =>
+                                        q.id === p.id
+                                          ? {
+                                              ...q,
+                                              category,
+                                              reserveOnly:
+                                                category === "reserve",
+                                            }
+                                          : q,
+                                      ),
+                                    },
+                                    "دستهٔ پرسنل ذخیره شد؛ برنامه‌های قبلی تغییر نکردند.",
+                                  );
+                                }}
+                              >
+                                {Object.entries(personnelCategories).map(
+                                  ([value, label]) => (
+                                    <option key={value} value={value}>
+                                      {label}
+                                    </option>
+                                  ),
+                                )}
+                              </select>
                             </td>
                             <td>
                               {next ? (
@@ -1469,13 +1643,24 @@ export default function App() {
                               >
                                 {p.active ? "غیرفعال کردن" : "فعال کردن"}
                               </button>
+                              <button
+                                className="text-button person-delete"
+                                aria-label={`حذف ${p.name}`}
+                                onClick={() => {
+                                  setDeleteId(p.id);
+                                  setDeleteConfirmation("");
+                                  open("delete-person");
+                                }}
+                              >
+                                <Trash2 size={15} /> حذف
+                              </button>
                             </td>
                           </tr>
                         );
                       })}
                     </tbody>
                   </table>
-                  {!data.people.filter(searchMatches).length && (
+                  {!visiblePeople.length && (
                     <Empty
                       title="نتیجه‌ای پیدا نشد"
                       text="نام، کد یا واحد دیگری را جست‌وجو کنید."
@@ -2296,7 +2481,7 @@ export default function App() {
                       {p.name}
                       <small>
                         {p.department}
-                        {p.reserveOnly ? " · فقط رزرو" : ""}
+                        {` · ${personnelCategories[personnelCategory(p)]}`}
                       </small>
                     </span>
                   </label>
@@ -2356,6 +2541,54 @@ export default function App() {
               accept=".xlsx"
               onChange={(e) => handleExcel(e.target.files?.[0])}
             />
+            <div className="form-grid import-category-controls">
+              <Field label="ورود به دسته">
+                <select
+                  value={importCategory}
+                  disabled={busy}
+                  onChange={(e) => {
+                    const category = e.target.value as
+                      | PersonnelCategory
+                      | "auto";
+                    setImportCategory(category);
+                    if (selectedExcel.current)
+                      void handleExcel(
+                        selectedExcel.current,
+                        sheetName,
+                        category,
+                      );
+                  }}
+                >
+                  <option value="auto">تشخیص از نام شیت / ستون فقط رزرو</option>
+                  {Object.entries(personnelCategories).map(([value, label]) => (
+                    <option key={value} value={value}>
+                      {label}
+                    </option>
+                  ))}
+                </select>
+              </Field>
+              {sheetNames.length > 0 && (
+                <Field label="شیت اکسل">
+                  <select
+                    value={sheetName}
+                    disabled={busy}
+                    onChange={(e) =>
+                      void handleExcel(selectedExcel.current, e.target.value)
+                    }
+                  >
+                    {sheetNames.map((name) => (
+                      <option key={name} value={name}>
+                        {name}
+                      </option>
+                    ))}
+                  </select>
+                </Field>
+              )}
+            </div>
+            <p className="muted">
+              برای هر دسته یک فایل جدا یا یک شیت انتخاب کنید، ورود را تأیید کنید
+              و سپس دستهٔ بعدی را وارد کنید.
+            </p>
             <button
               className="upload-zone"
               onClick={() => importInput.current?.click()}
@@ -2437,7 +2670,7 @@ export default function App() {
                           <td>{p.name}</td>
                           <td>{p.id.startsWith("name:") ? "—" : fa(p.id)}</td>
                           <td>{p.department || "—"}</td>
-                          <td>{p.reserveOnly ? "فقط رزرو" : "اصلی و رزرو"}</td>
+                          <td>{personnelCategories[personnelCategory(p)]}</td>
                         </tr>
                       ))}
                     </tbody>
@@ -2467,6 +2700,59 @@ export default function App() {
               انصراف
             </button>
           </div>
+        </Modal>
+      )}
+
+      {dialog === "delete-person" && deletingPerson && (
+        <Modal title="حذف پرسنل" subtitle={deletingPerson.name} onClose={close}>
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              try {
+                const next = deletePerson(data, deleteId, deleteConfirmation);
+                if (commit(next, "پرسنل حذف شد.")) close();
+              } catch (e) {
+                setError((e as Error).message);
+              }
+            }}
+          >
+            <div className="modal-body form-stack">
+              <Notice>
+                {deletionBlocker ||
+                  "این فرد سابقه یا عضویت در برنامه ندارد. حذف دائمی است؛ برای نگهداری یک نسخه، ابتدا پشتیبان بگیرید."}
+              </Notice>
+              {!deletionBlocker && (
+                <Field label="نام کامل فرد برای تأیید حذف">
+                  <input
+                    autoComplete="off"
+                    value={deleteConfirmation}
+                    onChange={(e) => setDeleteConfirmation(e.target.value)}
+                    placeholder={deletingPerson.name}
+                  />
+                </Field>
+              )}
+              {error && <ErrorText text={error} />}
+            </div>
+            <div className="modal-footer">
+              <button
+                type="submit"
+                className="button person-delete-confirm"
+                disabled={
+                  !!deletionBlocker ||
+                  deleteConfirmation.trim() !== deletingPerson.name
+                }
+              >
+                <Trash2 size={17} /> حذف دائمی پرسنل
+              </button>
+              <button
+                type="button"
+                className="button button-secondary"
+                onClick={close}
+              >
+                انصراف
+              </button>
+            </div>
+          </form>
         </Modal>
       )}
 
@@ -2540,19 +2826,25 @@ export default function App() {
                   />
                 </Field>
               </div>
-              <label className="checkbox-label">
-                <input
-                  type="checkbox"
-                  checked={personForm.reserveOnly}
-                  onChange={(e) =>
+              <Field label="دستهٔ پرسنل">
+                <select
+                  value={personForm.category}
+                  onChange={(e) => {
+                    const category = e.target.value as PersonnelCategory;
                     setPersonForm({
                       ...personForm,
-                      reserveOnly: e.target.checked,
-                    })
-                  }
-                />
-                این فرد فقط در فهرست رزرو قرار بگیرد
-              </label>
+                      category,
+                      reserveOnly: category === "reserve",
+                    });
+                  }}
+                >
+                  {Object.entries(personnelCategories).map(([value, label]) => (
+                    <option key={value} value={value}>
+                      {label}
+                    </option>
+                  ))}
+                </select>
+              </Field>
               {error && <ErrorText text={error} />}
             </div>
             <div className="modal-footer">

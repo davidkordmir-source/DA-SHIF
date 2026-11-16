@@ -88,7 +88,7 @@ for (const [name, original] of [
       expect(archive).toBeTruthy();
       expect(await fs.readFile(path.join(directory, archive!), "utf8")).toBe(original);
       await page.getByRole("button", { name: /^پرسنل/ }).click();
-      await expect(page.getByRole("button", { name: /کارمند اول/ })).toBeVisible();
+      await expect(page.getByRole("button", { name: "کارمند اول مشاهدهٔ پرونده", exact: true })).toBeVisible();
       await page.getByRole("button", { name: "تنظیمات", exact: true }).click();
       await page.getByRole("button", { name: "تم شب آرام", exact: true }).click();
       await page.getByRole("button", { name: "فونت استعداد", exact: true }).click();

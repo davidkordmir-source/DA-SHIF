@@ -1,9 +1,11 @@
+export type PersonnelCategory = "night-lead" | "companion" | "reserve";
 export type Person = {
   id: string;
   name: string;
   department: string;
   active: boolean;
   reserveOnly: boolean;
+  category?: PersonnelCategory;
 };
 export type AttendanceStatus = "present" | "excused" | "unexcused";
 export type Attendance = {

@@ -1,5 +1,6 @@
 import ExcelJS from "exceljs";
-import type { AppData, Person } from "../types";
+import type { AppData, Person, PersonnelCategory } from "../types";
+import { personnelCategories, personnelCategory } from "./people";
 import {
   fa,
   latin,
@@ -51,13 +52,18 @@ function styleSheet(sheet: ExcelJS.Worksheet) {
 }
 export async function downloadTemplate() {
   const wb = new ExcelJS.Workbook();
-  const sheet = wb.addWorksheet("پرسنل");
-  sheet.addRows([
-    ["کد پرسنلی", "نام و نام خانوادگی", "واحد", "فقط رزرو"],
-    ["1001", "سارا احمدی", "عملیات", "خیر"],
-    ["1002", "عسل رضایی", "پشتیبانی", "خیر"],
-  ]);
-  styleSheet(sheet);
+  Object.values(personnelCategories).forEach((name, index) => {
+    const sheet = wb.addWorksheet(name);
+    sheet.addRows([
+      ["کد پرسنلی", "نام و نام خانوادگی", "واحد"],
+      [
+        String(1001 + index),
+        ["سارا احمدی", "عسل رضایی", "علی حسینی"][index],
+        "عملیات",
+      ],
+    ]);
+    styleSheet(sheet);
+  });
   await writeWorkbook(wb, "الگوی-ورود-پرسنل.xlsx");
 }
 const normalized = (v: string) =>
@@ -68,7 +74,13 @@ const normalized = (v: string) =>
     .toLowerCase();
 export async function readPeople(
   file: File,
-): Promise<{ people: Person[]; errors: string[] }> {
+  options: { sheetName?: string; category?: PersonnelCategory } = {},
+): Promise<{
+  people: Person[];
+  errors: string[];
+  sheetNames: string[];
+  sheetName: string;
+}> {
   if (!/\.xlsx$/i.test(file.name))
     throw new Error(
       "فایل باید با فرمت xlsx باشد. فایل قدیمی xls را در اکسل با فرمت xlsx ذخیره کنید.",
@@ -83,9 +95,19 @@ export async function readPeople(
       "فایل اکسل قابل خواندن نیست. فایل سالم و بدون رمز انتخاب کنید.",
     );
   }
-  const sheet = wb.worksheets[0];
-  if (!sheet || sheet.rowCount < 2)
-    throw new Error("فایل باید سطر عنوان و حداقل یک نفر داشته باشد.");
+  const sheet = options.sheetName
+    ? wb.getWorksheet(options.sheetName)
+    : wb.worksheets[0];
+  if (!sheet) throw new Error("شیت انتخاب‌شده پیدا نشد.");
+  if (sheet.rowCount < 2)
+    return {
+      people: [],
+      errors: [
+        "این شیت باید سطر عنوان و حداقل یک نفر داشته باشد؛ شیت دیگری انتخاب کنید.",
+      ],
+      sheetNames: wb.worksheets.map((s) => s.name),
+      sheetName: sheet.name,
+    };
   if (sheet.rowCount > 2001)
     throw new Error("حداکثر ۲۰۰۰ نفر در هر فایل قابل ورود است.");
   const cellText = (row: number, col: number) =>
@@ -103,9 +125,14 @@ export async function readPeople(
   const deptCol = find(["واحد", "بخش", "department"]);
   const reserveCol = find(["فقط رزرو", "reserve only"]);
   if (!nameCol && !firstCol)
-    throw new Error(
-      "ستون «نام و نام خانوادگی» یافت نشد. از فایل الگو استفاده کنید.",
-    );
+    return {
+      people: [],
+      errors: [
+        "ستون «نام و نام خانوادگی» یافت نشد. شیت دیگری انتخاب کنید یا از فایل الگو استفاده کنید.",
+      ],
+      sheetNames: wb.worksheets.map((s) => s.name),
+      sheetName: sheet.name,
+    };
   const people: Person[] = [],
     errors: string[] = [];
   const ids = new Set<string>(),
@@ -134,21 +161,33 @@ export async function readPeople(
     }
     ids.add(id);
     names.add(nameKey);
+    const reserveOnly =
+      !!reserveCol &&
+      ["بله", "yes", "true", "1"].includes(
+        normalized(cellText(row, reserveCol)),
+      );
+    const category =
+      options.category ??
+      (Object.entries(personnelCategories).find(
+        ([, label]) => normalized(label) === normalized(sheet.name),
+      )?.[0] as PersonnelCategory | undefined);
     people.push({
       id,
       name,
       department: deptCol ? cellText(row, deptCol).slice(0, 100) : "",
       active: true,
-      reserveOnly:
-        !!reserveCol &&
-        ["بله", "yes", "true", "1"].includes(
-          normalized(cellText(row, reserveCol)),
-        ),
+      reserveOnly: category ? category === "reserve" : reserveOnly,
+      ...(category ? { category } : {}),
     });
   }
   if (!people.length && !errors.length)
     throw new Error("هیچ نامی در فایل پیدا نشد.");
-  return { people, errors };
+  return {
+    people,
+    errors,
+    sheetNames: wb.worksheets.map((s) => s.name),
+    sheetName: sheet.name,
+  };
 }
 export function buildScheduleWorkbook(data: AppData, dates: string[]) {
   if (!dates.length) throw new Error("بازهٔ خروجی خالی است.");
@@ -222,6 +261,7 @@ export function buildScheduleWorkbook(data: AppData, dates: string[]) {
     "حضور جایگزین",
     "شیفت تعطیل پیش از این ماه",
     "جمعه پیش از این ماه",
+    "دستهٔ پرسنل",
   ]);
   for (const p of data.people) {
     const s = personStats(
@@ -247,6 +287,7 @@ export function buildScheduleWorkbook(data: AppData, dates: string[]) {
       s.replacements,
       prior.workloadHoliday,
       prior.workloadFriday,
+      personnelCategories[personnelCategory(p)],
     ]);
   }
   professionalSheet(
@@ -254,7 +295,7 @@ export function buildScheduleWorkbook(data: AppData, dates: string[]) {
     "گزارش عدالت و سهم شیفت‌ها",
     `${solarLabel(dates[0])} تا ${solarLabel(dates.at(-1)!)}`,
     "سوابق قبلی شامل حق شیفت‌های محفوظ در بایگانی است",
-    [18, 28, 16, 16, 16, 16, 16, 18, 18, 18, 22, 22],
+    [18, 28, 16, 16, 16, 16, 16, 18, 18, 18, 22, 22, 20],
   );
   if (report.rowCount > 5)
     report.addConditionalFormatting({
